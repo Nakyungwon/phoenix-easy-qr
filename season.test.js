@@ -1,6 +1,6 @@
 // 실행: node season.test.js
 const assert = require('node:assert');
-const { parseSeasonInfo } = require('./www/season.js');
+const { parseSeasonInfo, maskName } = require('./www/season.js');
 
 const html = `
   data: function () {
@@ -32,4 +32,11 @@ assert.deepStrictEqual(parseSeasonInfo(html), {
   pkgUseDateYn: 'Y',
 });
 assert.throws(() => parseSeasonInfo('<html></html>'), /시즌패스 정보/);
+
+assert.strictEqual(maskName('홍길동'), '홍*동');
+assert.strictEqual(maskName('남궁민수'), '남**수');
+assert.strictEqual(maskName('이산'), '이*');
+assert.strictEqual(maskName('홍*동'), '홍*동');
+assert.strictEqual(maskName(''), '');
+assert.strictEqual(maskName(undefined), '');
 console.log('ok');

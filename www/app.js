@@ -88,7 +88,9 @@ async function getIssueNo() {
 // 티켓 카드 머리글은 로그인한 계정의 시즌패스 페이지 값으로만 채운다. 로그아웃 상태면 비운다.
 function showHolder(info) {
   $('#season').textContent = (info && info.sesnDivNm) || '시즌패스';
-  $('#holder').textContent = info ? info.showKorCustNm || '-' : '로그인 전';
+  $('#holder').textContent = info ? maskName(info.showKorCustNm) || '-' : '로그인 전';
+  // 계정 카드에는 아이디 대신 가린 이름을 보여준다. 이름은 시즌패스 페이지를 읽은 뒤에야 알 수 있다.
+  if (info) $('#who').textContent = maskName(info.showKorCustNm) || '휘닉스 회원';
   $('#ticketNo').textContent = (info && info.viewTcktNo) || '';
 }
 
@@ -226,7 +228,7 @@ function setLoggedIn(id) {
   $('#account').hidden = !id;
   $('#loginState').textContent = id ? '로그인됨' : '로그인 전';
   $('#loginState').classList.toggle('on', !!id);
-  $('#who').textContent = id || '';
+  $('#who').textContent = id ? $('#who').textContent || '휘닉스 회원' : '';
   $('#whoSub').textContent = opts.auto ? '자동 로그인 켜짐' : opts.save ? '아이디/비번 저장됨' : '';
 }
 

@@ -10,4 +10,12 @@ function parseSeasonInfo(html) {
   return info;
 }
 
-if (typeof module !== 'undefined') module.exports = { parseSeasonInfo };
+// 화면에 이름을 보여줄 때 가운데 글자를 가린다. 홍길동 → 홍*동, 이산 → 이*. 이미 가려진 값이면 그대로 둔다.
+function maskName(name) {
+  if (!name || name.includes('*')) return name || '';
+  const chars = [...name];
+  if (chars.length < 3) return chars[0] + '*';
+  return chars[0] + '*'.repeat(chars.length - 2) + chars[chars.length - 1];
+}
+
+if (typeof module !== 'undefined') module.exports = { parseSeasonInfo, maskName };
