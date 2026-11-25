@@ -2,7 +2,7 @@
 // 따옴표 없는 키, 문자열/숫자 값, 주석이 섞인 JS 리터럴이라 JSON.parse를 쓸 수 없다.
 function parseSeasonInfo(html) {
   const block = html.match(/seasonInfo\s*:\s*\{([^}]*)\}/);
-  if (!block) throw new Error('페이지에서 시즌패스 정보를 찾지 못함');
+  if (!block) throw Object.assign(new Error('페이지에서 시즌패스 정보를 찾지 못함'), { code: 'season-parse' });
   const info = {};
   for (const [, key, str, num] of block[1].matchAll(/(\w+)\s*:\s*(?:"([^"]*)"|(-?[\d.]+))/g)) {
     info[key] = str !== undefined ? str : Number(num);

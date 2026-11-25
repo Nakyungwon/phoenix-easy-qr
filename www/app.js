@@ -7,11 +7,13 @@ const platform = window.Capacitor ? Capacitor.getPlatform() : 'web';
 const SESSION_KEY = 'pxSession';
 // 휘닉스 서버에 닿지 못한 경우(502~504, Cloudflare 520~527)와 프록시 요청 제한(429)에 걸린 경우다.
 // 아이디/비번 문제가 아니라 잠시 뒤 다시 하면 되는 오류라, 상태 코드 대신 그렇게 안내한다.
+// 오류에 종류(code)를 붙여 둔다. 화면 문구에는 휘닉스가 보낸 원문이 섞일 수 있어서, 오류 보고에는 종류만 보낸다.
+const fail = (code, message) => Object.assign(new Error(message), { code });
 const RETRY_LATER = new Set([502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527]);
 async function api(path, init = {}) {
   const res = platform === 'web' ? await proxyFetch(path, init) : await fetch(BASE + path, init);
-  if (RETRY_LATER.has(res.status)) throw new Error(`휘닉스 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요. (${res.status})`);
-  if (res.status === 429) throw new Error('요청이 너무 많아요. 1분쯤 뒤에 다시 시도해 주세요.');
+  if (RETRY_LATER.has(res.status)) throw fail(`upstream-${res.status}`, `휘닉스 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요. (${res.status})`);
+  if (res.status === 429) throw fail('rate-limit', '요청이 너무 많아요. 1분쯤 뒤에 다시 시도해 주세요.');
   return res;
 }
 async function proxyFetch(path, init) {
@@ -51,13 +53,13 @@ async function login(id, pw) {
   form.append('mbPw', pw);
   const res = await api('/api/member/login', { method: 'POST', body: form });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok || body.logged !== 'Y') throw new Error(body.msg ? plainText(body.msg) : `로그인 실패 (${res.status})`);
+  if (!res.ok || body.logged !== 'Y') throw fail(`login-failed-${res.status}`, body.msg ? plainText(body.msg) : `로그인 실패 (${res.status})`);
 }
 
 async function fetchSeasonInfo() {
   const res = await api('/m/page/mypage/history/snowpark');
-  if (res.status === 401) throw new Error(NEED_LOGIN);
-  if (!res.ok) throw new Error(`시즌패스 페이지 실패 (${res.status})`);
+  if (res.status === 401) throw fail('need-login', NEED_LOGIN);
+  if (!res.ok) throw fail(`season-page-${res.status}`, `시즌패스 페이지 실패 (${res.status})`);
   const info = parseSeasonInfo(await res.text());
   showHolder(info);
   return info;
@@ -80,16 +82,16 @@ async function apply(info) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (res.status === 401) throw new Error(NEED_LOGIN);
+  if (res.status === 401) throw fail('need-login', NEED_LOGIN);
   const result = await res.json().catch(() => ({}));
-  if (!res.ok || result.responseMessage) throw new Error(`QR 신청 실패 (${res.status}): ${plainText(result.responseMessage || '')}`);
+  if (!res.ok || result.responseMessage) throw fail(`apply-failed-${res.status}`, `QR 신청 실패 (${res.status}): ${plainText(result.responseMessage || '')}`);
 }
 
 // 페이지의 fngprtRegYn/QR 번호가 자정에 초기화되는지 알 수 없어서, 그날 첫 QR 받기는 항상 신청부터 한다.
 async function getIssueNo() {
   await apply(await fetchSeasonInfo());
   const info = await fetchSeasonInfo();
-  if (!info.mpSstkIssueNo) throw new Error(`QR 번호가 없어요 (${info.mpSstkIssueResult || '사유 없음'})`);
+  if (!info.mpSstkIssueNo) throw fail('no-issue-no', `QR 번호가 없어요 (${info.mpSstkIssueResult || '사유 없음'})`);
   return info.mpSstkIssueNo;
 }
 
@@ -115,7 +117,7 @@ function fetchQrImage(issueNo) {
       canvas.getContext('2d').drawImage(img, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
-    img.onerror = () => reject(new Error('QR 이미지를 불러오지 못했어요'));
+    img.onerror = () => reject(fail('qr-image', 'QR 이미지를 불러오지 못했어요'));
     img.src = 'https://api.qrserver.com/v1/create-qr-code/?qzone=1&data=' + encodeURIComponent(issueNo);
   });
 }
@@ -163,6 +165,19 @@ $('#qrFloatClose').onclick = () => {
   updateQrFloat();
 };
 
+// PWA에서 난 오류를 프록시 로그에 남긴다. 어떤 동작에서 어떤 종류의 오류였는지만 보내고, 실패해도 무시한다.
+// 앱(안드로이드/iOS)은 이 서버를 쓰지 않으므로 보내지 않는다.
+function reportError(action, err) {
+  if (platform !== 'web') return;
+  const code = err.code || (err.name === 'TypeError' ? 'network' : 'unknown');
+  fetch('/px/_error', {
+    method: 'POST',
+    headers: { 'X-App': 'phoenix-easy-qr', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, code }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 async function run(button, label, task) {
   button.disabled = true;
   button.classList.add('busy');
@@ -174,6 +189,7 @@ async function run(button, label, task) {
   } catch (err) {
     $('#msg').className = 'error';
     $('#msg').textContent = err.message;
+    reportError(label, err);
     // 세션이 끊겼으면 로그인 화면으로 되돌린다.
     if (err.message === NEED_LOGIN) setLoggedIn(null);
   } finally {
@@ -287,7 +303,7 @@ async function applyLockScreen(qr) {
       staleAt: Date.parse(`${qr.date}T23:59:59+09:00`),
     });
   } else {
-    throw new Error('앱에서만 잠금화면에 띄울 수 있어요');
+    throw fail('web-lockscreen', '앱에서만 잠금화면에 띄울 수 있어요');
   }
   if (qr) localStorage.setItem(LOCK_DATE_KEY, qr.date);
   else localStorage.removeItem(LOCK_DATE_KEY);
