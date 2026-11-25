@@ -123,17 +123,26 @@ function showQr(qr) {
   updateQrFloat();
 }
 
-// 오늘 QR이 있으면 스크롤 중에도 QR이 늘 보이게 한다. QR 박스가 조금이라도 화면 밖으로 나가는 순간 떠 있는 QR을 보여준다.
-// 0.99: 소수점 반올림 때문에 다 보이는데도 비율이 1이 안 되는 경우가 있다.
-let qrOffscreen = false;
+// 오늘 QR이 있으면 스크롤해도 QR이 처음 보이던 자리와 크기 그대로 떠 있게 한다.
+// X로 닫으면 맨 위까지 다시 올라갔다가 내려올 때 다시 띄운다.
+let qrFloatClosed = false;
 function updateQrFloat() {
-  $('#qrFloat').hidden = !qrOffscreen || $('#qrImg').hidden;
+  const scrolled = window.scrollY > 0;
+  if (!scrolled) qrFloatClosed = false;
+  const float = $('#qrFloat');
+  float.hidden = !scrolled || qrFloatClosed || $('#qrImg').hidden;
+  if (float.hidden) return;
+  // 원래 QR 박스의 문서 위치가 곧 맨 위에서 보이던 화면 위치다. 화면보다 아래에 있었으면 화면 안으로 끌어올린다.
+  const box = $('#qr').getBoundingClientRect();
+  const top = Math.max(0, Math.min(box.top + window.scrollY, window.innerHeight - box.height));
+  Object.assign(float.style, { top: `${top}px`, left: `${box.left}px`, width: `${box.width}px`, height: `${box.height}px` });
 }
-new IntersectionObserver(([entry]) => {
-  qrOffscreen = entry.intersectionRatio < 0.99;
+window.addEventListener('scroll', updateQrFloat, { passive: true });
+window.addEventListener('resize', updateQrFloat);
+$('#qrFloatClose').onclick = () => {
+  qrFloatClosed = true;
   updateQrFloat();
-}, { threshold: 0.99 }).observe($('#qr'));
-$('#qrFloat').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 async function run(button, label, task) {
   button.disabled = true;
