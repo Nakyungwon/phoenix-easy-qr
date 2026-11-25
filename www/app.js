@@ -5,8 +5,16 @@ const platform = window.Capacitor ? Capacitor.getPlatform() : 'web';
 // 앱(안드로이드/iOS)은 네이티브 HTTP로 휘닉스를 직접 부르고 쿠키도 네이티브가 관리한다.
 // 웹(PWA)은 CORS 때문에 같은 출처의 프록시(/px/...)를 거치고, 휘닉스 세션 쿠키를 X-Session 헤더로 주고받는다.
 const SESSION_KEY = 'pxSession';
+// 휘닉스 서버에 닿지 못한 경우(502~504, Cloudflare 520~527)와 프록시 요청 제한(429)에 걸린 경우다.
+// 아이디/비번 문제가 아니라 잠시 뒤 다시 하면 되는 오류라, 상태 코드 대신 그렇게 안내한다.
+const RETRY_LATER = new Set([502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527]);
 async function api(path, init = {}) {
-  if (platform !== 'web') return fetch(BASE + path, init);
+  const res = platform === 'web' ? await proxyFetch(path, init) : await fetch(BASE + path, init);
+  if (RETRY_LATER.has(res.status)) throw new Error(`휘닉스 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요. (${res.status})`);
+  if (res.status === 429) throw new Error('요청이 너무 많아요. 1분쯤 뒤에 다시 시도해 주세요.');
+  return res;
+}
+async function proxyFetch(path, init) {
   const headers = new Headers(init.headers);
   headers.set('X-App', 'phoenix-easy-qr');
   const session = sessionStorage.getItem(SESSION_KEY);
