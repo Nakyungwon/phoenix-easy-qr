@@ -10,7 +10,7 @@
 |---|---|---|
 | 안드로이드 앱 | 안드로이드 | [Releases](https://github.com/Nakyungwon/phoenix-easy-qr/releases)에서 APK를 받아 설치합니다. 잠금화면 배경 QR을 쓸 수 있습니다. |
 | iOS 앱 | 아이폰 | Xcode로 직접 설치합니다. 무료 계정이면 7일마다 다시 설치해야 합니다. 실시간 현황(라이브 액티비티) QR을 쓸 수 있습니다. |
-| PWA (웹앱) | 아이폰, 안드로이드 | https://phoenix-easy-qr.nakyungwon.workers.dev 를 Safari나 크롬에서 열고 **홈 화면에 추가**합니다. 설치 기한이 없습니다. 잠금화면 QR은 쓸 수 없습니다. |
+| PWA (웹앱) | 아이폰, 안드로이드 | https://phoenix-easy-qr.gate-pass.workers.dev 를 Safari나 크롬에서 열고 **홈 화면에 추가**합니다. 설치 기한이 없습니다. 잠금화면 QR은 쓸 수 없습니다. |
 
 ## 기획
 
@@ -188,7 +188,7 @@ npx @capacitor/assets generate --android --ios --iconBackgroundColor '#1E3A8A'
 ```bash
 cd worker
 npx wrangler login     # 처음 한 번
-npx wrangler deploy    # https://phoenix-easy-qr.nakyungwon.workers.dev
+npx wrangler deploy    # https://phoenix-easy-qr.gate-pass.workers.dev
 ```
 
 Cloudflare 무료 플랜(하루 10만 요청)으로 충분합니다.
