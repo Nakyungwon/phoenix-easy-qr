@@ -115,6 +115,7 @@ function showQr(qr) {
   $('#qrImg').hidden = !qr;
   $('#qrEmpty').hidden = !!qr;
   $('#clear').hidden = !qr;
+  $('#floatOpt').hidden = !qr;
   $('#qrImg').src = qr ? qr.img : '';
   $('#qrImg').alt = qr ? `입장 QR ${qr.issueNo}` : '';
   $('#issueNo').textContent = qr ? qr.issueNo : '';
@@ -124,13 +125,20 @@ function showQr(qr) {
 }
 
 // 오늘 QR이 있으면 스크롤해도 QR이 처음 보이던 자리와 크기 그대로 떠 있게 한다.
-// X로 닫으면 맨 위까지 다시 올라갔다가 내려올 때 다시 띄운다.
+// X로 닫으면 맨 위까지 다시 올라갔다가 내려올 때 다시 띄운다. QR 아래 체크박스로 아예 끌 수 있다(기본 켜짐).
+const FLOAT_KEY = 'qrFloat';
+$('#floatOn').checked = localStorage.getItem(FLOAT_KEY) !== 'off';
+$('#floatOn').onchange = (e) => {
+  localStorage.setItem(FLOAT_KEY, e.target.checked ? 'on' : 'off');
+  updateQrFloat();
+};
 let qrFloatClosed = false;
 function updateQrFloat() {
   const scrolled = window.scrollY > 0;
   if (!scrolled) qrFloatClosed = false;
   const float = $('#qrFloat');
-  float.hidden = !scrolled || qrFloatClosed || $('#qrImg').hidden;
+  float.hidden = !$('#floatOn').checked || !scrolled || qrFloatClosed || $('#qrImg').hidden;
+  $('#qr').classList.toggle('floating', !float.hidden);
   if (float.hidden) return;
   // 원래 QR 박스의 문서 위치가 곧 맨 위에서 보이던 화면 위치다. 화면보다 아래에 있었으면 화면 안으로 끌어올린다.
   const box = $('#qr').getBoundingClientRect();

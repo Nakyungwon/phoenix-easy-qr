@@ -106,6 +106,7 @@
   input:focus { border-color: var(--sky); outline: none; }
   form button { margin-top: 16px; }
   .checks { display: flex; gap: 20px; margin-top: 14px; }
+  .check[hidden] { display: none; }
   .check { display: inline-flex; align-items: center; gap: 8px; margin: 0; min-height: 44px; font-size: 14px; color: var(--text); font-weight: 500; cursor: pointer; }
   .check input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--primary); }
 
@@ -115,6 +116,8 @@
   /* 스크롤하면 QR을 처음 자리와 크기 그대로 띄워 둔다. 위치와 크기는 app.js가 원래 QR 박스에 맞춘다. */
   .qr-float { position: fixed; z-index: 10; padding: 12px; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 42, 95, .3); }
   .qr-float[hidden] { display: none; }
+  /* 떠 있는 동안 원래 QR 자리는 비워 둔다. 스크롤하면 QR 두 개가 겹쳐 보이지 않게 한다. */
+  .qr-box.floating { visibility: hidden; }
   .qr-float img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
   .qr-float-close { position: absolute; top: -12px; right: -12px; width: 40px; height: 40px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: var(--primary-deep); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(15, 42, 95, .3); }
 
@@ -152,6 +155,7 @@
       </div>
       <div class="issue-no" id="issueNo"></div>
       <div id="valid"></div>
+      <label class="check" id="floatOpt" hidden><input type="checkbox" id="floatOn">스크롤해도 QR 띄워 두기</label>
       <button class="btn-ghost btn-small" id="clear" hidden>QR 초기화</button>
     </div>
   </section>
