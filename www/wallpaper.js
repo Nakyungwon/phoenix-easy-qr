@@ -27,7 +27,7 @@ function composeLockWallpaper({ qrImg, issueNo, date, ticket }) {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,.85)';
   ctx.font = font(600, unit * 0.035);
-  const title = [ticket && ticket.sesnDivNm, ticket && ticket.showKorCustNm, ticket && ticket.viewTcktNo].filter(Boolean).join(' · ');
+  const title = [ticket && ticket.sesnDivNm, ticket && maskName(ticket.showKorCustNm), ticket && ticket.viewTcktNo].filter(Boolean).join(' · ');
   ctx.fillText(title || '휘팍 이지 QR', w / 2, top - unit * 0.035);
 
   // QR은 스캐너가 읽도록 흰 바탕 위에, 픽셀을 뭉개지 않고 그린다.

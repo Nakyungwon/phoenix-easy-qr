@@ -261,7 +261,7 @@ const loadImage = (src) => new Promise((resolve, reject) => {
 
 async function applyLockScreen(qr) {
   const ticket = JSON.parse(localStorage.getItem(TICKET_KEY) || 'null');
-  const title = [ticket && ticket.sesnDivNm, ticket && ticket.showKorCustNm].filter(Boolean).join(' · ') || '휘팍 이지 QR';
+  const title = [ticket && ticket.sesnDivNm, ticket && maskName(ticket.showKorCustNm)].filter(Boolean).join(' · ') || '휘팍 이지 QR';
   if (platform === 'android') {
     if (!qr) await plugins.LockWallpaper.clear();
     else await plugins.LockWallpaper.set({
