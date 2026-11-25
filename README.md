@@ -1,6 +1,6 @@
 # 휘팍 이지 QR
 
-휘닉스파크 시즌패스 입장 QR을 버튼 한 번으로 받아서 보여주는 개인용 앱입니다. 안드로이드와 iOS를 지원합니다.
+휘닉스파크 시즌패스 입장 QR을 버튼 한 번으로 받아서 보여주는 개인용 앱입니다. 안드로이드 앱, iOS 앱, PWA(웹앱)로 쓸 수 있고, 세 가지 모두 같은 `www/` 코드를 씁니다.
 
 웹사이트에서 QR을 받으려면 로그인하고, 마이페이지를 거쳐 시즌패스 페이지까지 들어가야 합니다. 게이트 앞에서 매번 이 과정을 거치는 게 번거로워서 만들었습니다. 받은 QR은 잠금화면에 띄울 수도 있습니다.
 
@@ -11,6 +11,8 @@
 | 안드로이드 앱 | 안드로이드 | [Releases](https://github.com/Nakyungwon/phoenix-easy-qr/releases)에서 APK를 받아 설치합니다. 잠금화면 배경 QR을 쓸 수 있습니다. |
 | iOS 앱 | 아이폰 | Xcode로 직접 설치합니다. 무료 계정이면 7일마다 다시 설치해야 합니다. 실시간 현황(라이브 액티비티) QR을 쓸 수 있습니다. |
 | PWA (웹앱) | 아이폰, 안드로이드 | https://phoenix-easy-qr.gate-pass.workers.dev 를 Safari나 크롬에서 열고 **홈 화면에 추가**합니다. 설치 기한이 없습니다. 잠금화면 QR은 쓸 수 없습니다. |
+
+> 아이폰 PWA는 꼭 **홈 화면에 추가**한 아이콘으로 여세요. Safari 탭으로 열면 7일 동안 방문하지 않았을 때 저장된 로그인 정보와 QR이 지워질 수 있습니다. 홈 화면에 추가한 웹앱은 이 규칙에서 빠집니다.
 
 ## 기획
 
@@ -32,7 +34,8 @@
 | QR 초기화        | 저장된 QR을 지웁니다. 다음 QR 받기 때 신청부터 다시 합니다.                                                                                                                  |
 | 자정 초기화      | KST 자정이 지나면 앱 안의 QR과 잠금화면 QR을 내립니다.                                                                                                                       |
 | 잠금화면 QR      | 안드로이드는 잠금화면 배경을 오늘 QR로 바꿉니다. iOS는 실시간 현황(라이브 액티비티)에 QR을 띄웁니다.                                                                         |
-| 티켓 설정 보기   | 마지막으로 신청 API에 보낸 값을 JSON으로 보여줍니다. 읽기 전용입니다.                                                                                                        |
+| 떠 있는 QR       | 오늘 QR이 있을 때 스크롤하면, 맨 위에서 QR이 보이던 자리와 크기 그대로 QR을 띄웁니다. 그동안 원래 QR 자리는 비웁니다. 카드 아래 **× 닫기**로 닫을 수 있고, 맨 위로 올라갔다가 내려오면 다시 뜹니다. |
+| 떠 있는 QR 설정  | QR 아래 **스크롤해도 QR 띄워 두기** 체크박스로 끄고 켭니다. 기본은 켜짐이고 기기에 저장됩니다.                                                                               |
 | 다크 모드        | 기기 설정을 따릅니다. 스캐너가 읽을 수 있도록 QR은 항상 흰 바탕에 그립니다.                                                                                                  |
 
 ## QR 받기 흐름
@@ -41,7 +44,8 @@
 
 1. **로그인** `POST https://phoenixhnr.co.kr/api/member/login`
    - form-data로 `mbNo`(아이디)와 `mbPw`(비번)를 보냅니다.
-   - 응답에 `logged: 'Y'`가 있으면 성공입니다. 세션 쿠키 `JSESSIONID`는 네이티브 쿠키 저장소가 관리합니다.
+   - 응답에 `logged: 'Y'`가 있으면 성공입니다. 세션 쿠키 `JSESSIONID`는 앱에서는 네이티브 쿠키 저장소가, PWA에서는 `X-Session` 헤더가 관리합니다([PWA 프록시](#pwa-프록시-worker) 참고).
+   - PWA는 같은 경로를 `/px/` 아래로 부릅니다. 예: `POST /px/api/member/login`. 아래 2~4단계도 같습니다.
 2. **시즌패스 페이지 조회** `GET https://phoenixhnr.co.kr/m/page/mypage/history/snowpark`
    - HTML 안에 들어 있는 Vue 데이터 `seasonInfo` 객체를 파싱합니다.
    - 로그인이 안 되어 있으면 401이 옵니다.
@@ -62,14 +66,18 @@
 
 ```
 www/                      화면과 로직 (양 플랫폼 공용, 빌드 도구 없음)
-  index.html              화면, API 호출, 상태 관리
+  index.html              화면 마크업과 스타일
+  app.js                  API 호출, 상태 관리, 떠 있는 QR (CSP 때문에 인라인 스크립트 대신 파일로 둠)
   season.js               시즌패스 페이지에서 seasonInfo 파싱
   vault.js                아이디/비번 암호화 저장
   wallpaper.js            안드로이드 잠금화면 배경 이미지 생성, iOS용 QR 모듈 배열 추출
-season.test.js            season.js 테스트 (npm test)
   manifest.json, sw.js    PWA 설정과 서비스 워커 (앱에서는 쓰지 않음)
+  _headers                PWA 보안 헤더 (Cloudflare 전용, 앱에서는 쓰지 않음)
+season.test.js            season.js 테스트 (npm test)
 capacitor.config.json     앱 ID, 앱 이름, CapacitorHttp 설정
-worker/                   PWA 배포용 Cloudflare Worker (www/ 정적 파일 + /px/ 프록시)
+worker/                   PWA 배포용 Cloudflare Worker
+  src/index.js            /px/ 프록시 (허용 경로, 출처 확인, IP별 제한, 세션 중계)
+  wrangler.toml           Worker 설정 (정적 파일은 ../www, 요청 제한 한도)
 assets/                   아이콘 원본 SVG/PNG
 
 android/app/src/main/java/com/kwna/phoenixqr/
@@ -95,6 +103,9 @@ ios/App/QrWidget/
 | `loginOpts`     | 저장, 자동 로그인 체크 상태                         |
 | `lockWallpaper` | 잠금화면 QR 체크 상태 (`on`/`off`)                  |
 | `lockQrDate`    | 잠금화면에 올라가 있는 QR의 날짜                    |
+| `qrFloat`       | 떠 있는 QR 체크 상태 (`on`/`off`, 없으면 켜짐)      |
+
+PWA는 휘닉스 세션 쿠키를 `sessionStorage`의 `pxSession`에 둡니다. 앱을 완전히 닫으면 지워지므로, 앱과 마찬가지로 새로 열면 로그인 전 상태로 시작합니다.
 
 ### 아이디/비번 암호화
 
@@ -120,6 +131,13 @@ ios/App/QrWidget/
 - 다음에 앱을 열면 앱이 지난 카드를 내립니다.
 
 ## 빌드와 설치
+
+### 버전
+
+릴리스할 때 두 곳의 버전을 같이 올립니다.
+
+- 안드로이드: `android/app/build.gradle`의 `versionCode`(정수, 매번 1씩)와 `versionName`
+- iOS: `ios/App/App.xcodeproj/project.pbxproj`의 `MARKETING_VERSION`
 
 ### 공통
 
@@ -157,17 +175,19 @@ cd android && ./gradlew assembleRelease     # app/build/outputs/apk/release/app-
 ### iOS
 
 1. 아이폰을 맥에 연결하고 "이 컴퓨터를 신뢰"를 누릅니다.
-2. 아래 명령으로 빌드합니다.
+2. 아래 명령으로 빌드하고 설치합니다.
    ```bash
+   npx cap sync ios
    cd ios/App
-   xcodebuild -project App.xcodeproj -scheme App -destination 'platform=iOS,id=<기기 UDID>' \
-     -allowProvisioningUpdates -allowProvisioningDeviceRegistration build
-   xcrun devicectl device install app --device <기기 UDID> <빌드된 App.app 경로>
+   xcodebuild -project App.xcodeproj -scheme App -configuration Debug -destination 'generic/platform=iOS' \
+     -derivedDataPath build/dd -allowProvisioningUpdates -allowProvisioningDeviceRegistration build
+   xcrun devicectl list devices      # 기기 식별자 확인
+   xcrun devicectl device install app --device <기기 식별자> build/dd/Build/Products/Debug-iphoneos/App.app
    ```
 3. 처음 설치했다면 아이폰 **설정 → 일반 → VPN 및 기기 관리**에서 개발자 앱을 신뢰합니다.
 4. **설정 → 휘팍 이지 QR → 실시간 현황**이 켜져 있는지 확인합니다.
 
-- 서명 팀은 프로젝트의 `DEVELOPMENT_TEAM`에 들어 있습니다(무료 Personal Team). 기기 UDID는 `xcrun xctrace list devices`로 확인합니다.
+- 서명 팀은 프로젝트의 `DEVELOPMENT_TEAM`에 들어 있습니다(무료 Personal Team).
 - 무료 계정으로 설치하면 7일마다 다시 설치해야 합니다.
 
 ### 아이콘
@@ -184,6 +204,7 @@ npx @capacitor/assets generate --android --ios --iconBackgroundColor '#1E3A8A'
 - 중계하는 경로는 앱이 쓰는 4개(로그인, 로그아웃, 시즌패스 페이지, QR 신청)뿐입니다. 그 밖의 경로는 403을 돌려줘서 공개 프록시로 쓰이지 않게 합니다.
 - **세션:** 휘닉스가 보낸 쿠키를 `X-Session` 응답 헤더로 넘겨주고, 브라우저가 다음 요청에 같은 헤더로 돌려주면 `Cookie`로 바꿔 붙입니다. 브라우저는 이 값을 `sessionStorage`에 보관합니다. Worker는 아무것도 저장하지 않고, 요청 본문(비밀번호)도 로그로 남기지 않습니다.
 - 웹에서는 잠금화면 QR 카드를 숨깁니다.
+- **서비스 워커:** 화면 파일을 네트워크에서 먼저 받고, 실패하면(오프라인) 캐시를 씁니다. 그래서 배포하면 다음에 앱을 열 때 바로 새 버전이 뜹니다. `/px/` 요청은 캐시하지 않습니다.
 - **남용 방지:** 앱 화면은 `X-App` 헤더를 붙여 보냅니다. 이 헤더가 없거나 다른 출처를 밝힌 요청은 403으로 막습니다. 다만 스크립트는 둘 다 꾸밀 수 있어서, 실제 방어선은 IP별 요청 제한(분당 20회, `wrangler.toml`)입니다. Cloudflare의 제한은 근사치라 짧은 시간에는 이보다 더 통과할 수 있습니다.
 - **보안 헤더:** `www/_headers`로 CSP(같은 출처 스크립트만 실행), 클릭재킹 방지, `nosniff`, `no-referrer`를 겁니다. 인라인 스크립트가 막히므로 화면 로직은 `www/app.js`에 둡니다.
 
@@ -203,5 +224,7 @@ Cloudflare 무료 플랜(하루 10만 요청)으로 충분합니다.
 - **안드로이드 네트워크:** 폰이 잠겨 있으면 백그라운드 앱의 네트워크가 막힙니다. QR 받기는 앱이 화면에 떠 있을 때 하면 됩니다.
 - **폴더블:** 삼성 폴드는 안쪽 화면 잠금화면 배경이 따로 있을 수 있어서, 바깥 화면에만 적용될 수 있습니다.
 - **iOS 실시간 현황:** 최대 12시간까지 유지됩니다. 잠금화면 카드 크기에서 게이트 스캐너가 QR을 읽는지는 실제 현장에서 확인해야 합니다.
+- **자정에 새 QR을 자동으로 받지 않습니다.** 자정에는 지난 QR을 지우기만 하고, 새 QR은 QR 받기를 눌러야 받습니다.
 - **PWA:** 잠금화면 QR을 쓸 수 없습니다. 앱이 꺼져 있을 때는 자정 초기화가 동작하지 않습니다. 대신 다음에 열 때 정리됩니다. 아이디와 비번은 Worker를 거쳐 휘닉스로 전달됩니다.
+- **떠 있는 QR:** 스크롤 위치에 맞춰 위치를 다시 잡습니다. 구형 아이폰에서 빠르게 튕겨 스크롤하면 잠깐 늦게 뜰 수 있습니다.
 - **개인용:** 휘닉스파크의 공식 앱이 아닙니다. 스토어에 배포하려면 이름과 브랜드 사용을 다시 검토해야 합니다.
