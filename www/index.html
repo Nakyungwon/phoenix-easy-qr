@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F2A5F">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="휘팍 이지 QR">
 <title>휘팍 이지 QR</title>
 <style>
   :root {
@@ -195,6 +200,21 @@
 <script>
   // 앱에서는 Capacitor가 fetch를 네이티브 HTTP로 바꿔 보내므로 CORS가 없고, 쿠키(JSESSIONID)도 네이티브 쿠키 저장소가 알아서 붙인다.
   const BASE = 'https://phoenixhnr.co.kr';
+  const platform = window.Capacitor ? Capacitor.getPlatform() : 'web';
+
+  // 앱(안드로이드/iOS)은 네이티브 HTTP로 휘닉스를 직접 부르고 쿠키도 네이티브가 관리한다.
+  // 웹(PWA)은 CORS 때문에 같은 출처의 프록시(/px/...)를 거치고, 휘닉스 세션 쿠키를 X-Session 헤더로 주고받는다.
+  const SESSION_KEY = 'pxSession';
+  async function api(path, init = {}) {
+    if (platform !== 'web') return fetch(BASE + path, init);
+    const headers = new Headers(init.headers);
+    const session = sessionStorage.getItem(SESSION_KEY);
+    if (session) headers.set('X-Session', session);
+    const res = await fetch('/px' + path, { ...init, headers });
+    const fresh = res.headers.get('X-Session');
+    if (fresh) sessionStorage.setItem(SESSION_KEY, fresh);
+    return res;
+  }
   // QR은 KST 자정까지만 유효하다. 받은 QR 번호를 날짜와 함께 둔다.
   const QR_KEY = 'qr';
   // 마지막으로 신청 API에 보낸 값. 화면 확인용이다.
@@ -220,13 +240,13 @@
     const form = new FormData();
     form.append('mbNo', id);
     form.append('mbPw', pw);
-    const res = await fetch(`${BASE}/api/member/login`, { method: 'POST', body: form });
+    const res = await api('/api/member/login', { method: 'POST', body: form });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || body.logged !== 'Y') throw new Error(body.msg ? plainText(body.msg) : `로그인 실패 (${res.status})`);
   }
 
   async function fetchSeasonInfo() {
-    const res = await fetch(`${BASE}/m/page/mypage/history/snowpark`);
+    const res = await api('/m/page/mypage/history/snowpark');
     if (res.status === 401) throw new Error(NEED_LOGIN);
     if (!res.ok) throw new Error(`시즌패스 페이지 실패 (${res.status})`);
     const info = parseSeasonInfo(await res.text());
@@ -247,7 +267,7 @@
     };
     showTicket(body);
     localStorage.setItem(TICKET_KEY, JSON.stringify(body));
-    const res = await fetch(`${BASE}/api/reservation/pyeongchang/snowpark/season/updateFngprtRegDttm`, {
+    const res = await api('/api/reservation/pyeongchang/snowpark/season/updateFngprtRegDttm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -384,7 +404,8 @@
 
   // 저장된 아이디/비번과 자동 로그인 설정은 그대로 둔다. 서버 세션만 끊는다.
   $('#logout').onclick = async () => {
-    await fetch(`${BASE}/api/member/logout`).catch(() => {});
+    await api('/api/member/logout').catch(() => {});
+    sessionStorage.removeItem(SESSION_KEY);
     setLoggedIn(null);
     $('#msg').className = '';
     $('#msg').textContent = '로그아웃했어요';
@@ -400,7 +421,6 @@
   const WP_KEY = 'lockWallpaper';
   // 잠금화면에 올라가 있는 QR의 날짜. 다음 날 앱을 열면 이걸 보고 지난 QR을 내린다.
   const LOCK_DATE_KEY = 'lockQrDate';
-  const platform = window.Capacitor ? Capacitor.getPlatform() : 'web';
   const plugins = window.Capacitor ? Capacitor.Plugins : {};
   const loadImage = (src) => new Promise((resolve, reject) => {
     const img = new Image();
@@ -438,6 +458,8 @@
   }
 
   if (platform === 'ios') $('#lockWpLabel').textContent = '잠금화면 실시간 현황에 오늘 QR 띄우기';
+  // 웹(PWA)은 잠금화면에 아무것도 띄울 수 없다.
+  if (platform === 'web') $('#lockWp').closest('.card').hidden = true;
   $('#lockWp').checked = localStorage.getItem(WP_KEY) === 'on';
   $('#lockWp').onchange = (e) => {
     const on = e.target.checked;
@@ -504,6 +526,9 @@
   });
   expireOldQr();
   scheduleMidnight();
+
+  // PWA: 앱 화면을 캐시해서 신호가 없어도 저장된 QR을 띄운다. 앱(Capacitor)에서는 필요 없다.
+  if (platform === 'web' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
   syncOpts();
   if (opts.save) {

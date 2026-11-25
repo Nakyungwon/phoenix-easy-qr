@@ -4,12 +4,20 @@
 
 웹사이트에서 QR을 받으려면 로그인하고, 마이페이지를 거쳐 시즌패스 페이지까지 들어가야 합니다. 게이트 앞에서 매번 이 과정을 거치는 게 번거로워서 만들었습니다. 받은 QR은 잠금화면에 띄울 수도 있습니다.
 
+## 쓰는 방법
+
+| 방식 | 대상 | 특징 |
+|---|---|---|
+| 안드로이드 앱 | 안드로이드 | [Releases](https://github.com/Nakyungwon/phoenix-easy-qr/releases)에서 APK를 받아 설치합니다. 잠금화면 배경 QR을 쓸 수 있습니다. |
+| iOS 앱 | 아이폰 | Xcode로 직접 설치합니다. 무료 계정이면 7일마다 다시 설치해야 합니다. 실시간 현황(라이브 액티비티) QR을 쓸 수 있습니다. |
+| PWA (웹앱) | 아이폰, 안드로이드 | https://phoenix-easy-qr.nakyungwon.workers.dev 를 Safari나 크롬에서 열고 **홈 화면에 추가**합니다. 설치 기한이 없습니다. 잠금화면 QR은 쓸 수 없습니다. |
+
 ## 기획
 
 - **QR은 하루 단위로 유효합니다.** 한국 시간(KST) 자정에 초기화되므로, 그날 처음 한 번만 신청하면 됩니다.
 - **실제 서비스와 똑같은 QR을 보여줍니다.** 사이트처럼 `api.qrserver.com`에서 QR 이미지를 받습니다. 앱이 직접 그리면 데이터는 같아도 마스크 패턴이 달라져서 모양이 달라지기 때문입니다.
 - **한 번 받은 QR은 네트워크 없이 뜹니다.** 스키장 게이트처럼 신호가 약한 곳을 생각해서, 받은 이미지를 기기에 저장합니다.
-- **CORS가 생기지 않습니다.** Capacitor가 `fetch`를 기기의 네이티브 HTTP로 보내기 때문에 별도 프록시 서버가 필요 없습니다.
+- **CORS가 생기지 않습니다.** 앱에서는 Capacitor가 `fetch`를 기기의 네이티브 HTTP로 보냅니다. PWA는 같은 출처의 Cloudflare Worker 프록시를 거칩니다.
 
 ## 기능
 
@@ -59,7 +67,9 @@ www/                      화면과 로직 (양 플랫폼 공용, 빌드 도구 
   vault.js                아이디/비번 암호화 저장
   wallpaper.js            안드로이드 잠금화면 배경 이미지 생성, iOS용 QR 모듈 배열 추출
 season.test.js            season.js 테스트 (npm test)
+  manifest.json, sw.js    PWA 설정과 서비스 워커 (앱에서는 쓰지 않음)
 capacitor.config.json     앱 ID, 앱 이름, CapacitorHttp 설정
+worker/                   PWA 배포용 Cloudflare Worker (www/ 정적 파일 + /px/ 프록시)
 assets/                   아이콘 원본 SVG/PNG
 
 android/app/src/main/java/com/kwna/phoenixqr/
@@ -168,6 +178,21 @@ npx @capacitor/assets generate --android --ios --iconBackgroundColor '#1E3A8A'
 
 > 생성기는 `android/.../mipmap-anydpi-v26/ic_launcher*.xml`에 16.7% inset을 다시 넣습니다. 아이콘 원본이 이미 안전 영역 안에 그려져 있어서 이 inset이 있으면 아이콘이 작아집니다. 생성기를 실행한 뒤에는 이 파일들에서 `inset`을 지워야 합니다.
 
+### PWA 프록시 (worker/)
+
+- 하나의 Worker가 `www/` 정적 파일을 내려주고, `/px/<경로>` 요청만 휘닉스로 중계합니다. PWA와 프록시가 같은 출처라서 CORS가 생기지 않습니다.
+- 중계하는 경로는 앱이 쓰는 4개(로그인, 로그아웃, 시즌패스 페이지, QR 신청)뿐입니다. 그 밖의 경로는 403을 돌려줘서 공개 프록시로 쓰이지 않게 합니다.
+- **세션:** 휘닉스가 보낸 쿠키를 `X-Session` 응답 헤더로 넘겨주고, 브라우저가 다음 요청에 같은 헤더로 돌려주면 `Cookie`로 바꿔 붙입니다. 브라우저는 이 값을 `sessionStorage`에 보관합니다. Worker는 아무것도 저장하지 않고, 요청 본문(비밀번호)도 로그로 남기지 않습니다.
+- 웹에서는 잠금화면 QR 카드를 숨깁니다.
+
+```bash
+cd worker
+npx wrangler login     # 처음 한 번
+npx wrangler deploy    # https://phoenix-easy-qr.nakyungwon.workers.dev
+```
+
+Cloudflare 무료 플랜(하루 10만 요청)으로 충분합니다.
+
 ## 제약과 주의
 
 - **로그인 세션:** 앱이 시작될 때 Capacitor가 세션 쿠키를 지웁니다. 그래서 앱을 새로 열면 항상 로그인 전 상태로 시작하고, 자동 로그인이 켜져 있으면 바로 다시 로그인합니다.
@@ -176,4 +201,5 @@ npx @capacitor/assets generate --android --ios --iconBackgroundColor '#1E3A8A'
 - **안드로이드 네트워크:** 폰이 잠겨 있으면 백그라운드 앱의 네트워크가 막힙니다. QR 받기는 앱이 화면에 떠 있을 때 하면 됩니다.
 - **폴더블:** 삼성 폴드는 안쪽 화면 잠금화면 배경이 따로 있을 수 있어서, 바깥 화면에만 적용될 수 있습니다.
 - **iOS 실시간 현황:** 최대 12시간까지 유지됩니다. 잠금화면 카드 크기에서 게이트 스캐너가 QR을 읽는지는 실제 현장에서 확인해야 합니다.
+- **PWA:** 잠금화면 QR을 쓸 수 없습니다. 앱이 꺼져 있을 때는 자정 초기화가 동작하지 않습니다. 대신 다음에 열 때 정리됩니다. 아이디와 비번은 Worker를 거쳐 휘닉스로 전달됩니다.
 - **개인용:** 휘닉스파크의 공식 앱이 아닙니다. 스토어에 배포하려면 이름과 브랜드 사용을 다시 검토해야 합니다.

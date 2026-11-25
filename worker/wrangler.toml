@@ -1,0 +1,10 @@
+name = "phoenix-easy-qr"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+account_id = "df186705d99d8ce14ba63dcf313b5c1a"
+
+# PWA 정적 파일은 앱과 같은 www/를 그대로 쓴다. /px/ 아래만 워커 코드가 처리한다.
+[assets]
+directory = "../www"
+binding = "ASSETS"
+run_worker_first = ["/px/*"]
