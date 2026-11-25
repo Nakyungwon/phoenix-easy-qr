@@ -8,3 +8,9 @@ account_id = "df186705d99d8ce14ba63dcf313b5c1a"
 directory = "../www"
 binding = "ASSETS"
 run_worker_first = ["/px/*"]
+
+# /px/ 프록시 IP별 요청 제한. 정상 사용은 한 번에 많아야 요청 서너 개라 넉넉하다.
+[[ratelimits]]
+name = "PX_LIMIT"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }

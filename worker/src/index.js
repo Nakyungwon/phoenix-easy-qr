@@ -22,6 +22,16 @@ export default {
     const path = url.pathname.slice(3);
     if (!ALLOWED.has(`${request.method} ${path}`)) return new Response('not allowed', { status: 403 });
 
+    // 앱 화면이 보낸 요청만 받는다. X-App 같은 커스텀 헤더는 다른 사이트의 브라우저 요청에 붙일 수 없고,
+    // 다른 출처를 밝힌 요청도 막는다. 스크립트는 둘 다 꾸밀 수 있으므로 아래 IP별 제한이 실제 방어선이다.
+    const origin = request.headers.get('Origin');
+    if (request.headers.get('X-App') !== 'phoenix-easy-qr' || (origin && origin !== url.origin)) {
+      return new Response('forbidden', { status: 403 });
+    }
+    // 대입 공격으로 휘닉스가 이 워커를 차단하거나 무료 한도를 다 쓰지 않게 IP별로 묶는다. 한도는 wrangler.toml.
+    const { success } = await env.PX_LIMIT.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
+    if (!success) return new Response('too many requests', { status: 429 });
+
     const headers = new Headers({ 'User-Agent': UA });
     const contentType = request.headers.get('Content-Type');
     if (contentType) headers.set('Content-Type', contentType);
@@ -36,7 +46,11 @@ export default {
     });
 
     // 비밀번호가 담긴 요청 본문은 로그로 남기지 않는다. 응답만 그대로 돌려준다.
-    const out = new Headers({ 'Content-Type': upstream.headers.get('Content-Type') || 'text/plain', 'Cache-Control': 'no-store' });
+    const out = new Headers({
+      'Content-Type': upstream.headers.get('Content-Type') || 'text/plain',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
     const cookies = upstream.headers.getSetCookie().map((c) => c.split(';')[0]);
     if (cookies.length) out.set('X-Session', mergeCookies(session, cookies));
     return new Response(upstream.body, { status: upstream.status, headers: out });
