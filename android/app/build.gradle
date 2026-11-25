@@ -16,8 +16,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // 릴리스 서명 키는 저장소 밖에 둔다. 기본 위치는 ~/.phoenix-easy-qr/keystore.properties,
+    // 다른 위치면 PHOENIX_KEYSTORE_PROPS 환경변수로 지정한다. 파일이 없으면 릴리스 APK는 서명되지 않는다.
+    def keystorePropsFile = file(System.getenv("PHOENIX_KEYSTORE_PROPS") ?: "${System.getProperty('user.home')}/.phoenix-easy-qr/keystore.properties")
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            def props = new Properties()
+            keystorePropsFile.withInputStream { props.load(it) }
+            release {
+                storeFile file(props.storeFile)
+                storePassword props.storePassword
+                keyAlias props.keyAlias
+                keyPassword props.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystorePropsFile.exists()) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

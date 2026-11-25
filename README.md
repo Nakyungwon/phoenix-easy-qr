@@ -128,6 +128,22 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 폰에서 USB 디버깅을 켜야 합니다.
 
+### 안드로이드 릴리스 APK
+
+배포용 APK는 저장소 밖에 둔 릴리스 키로 서명합니다.
+
+- 기본 위치: `~/.phoenix-easy-qr/keystore.properties`. 다른 위치에 두려면 `PHOENIX_KEYSTORE_PROPS` 환경변수로 경로를 지정합니다.
+- 키 파일이 없으면 릴리스 APK는 서명되지 않습니다.
+
+```bash
+npx cap sync android
+cd android && ./gradlew assembleRelease     # app/build/outputs/apk/release/app-release.apk
+```
+
+> 릴리스 키를 잃어버리면 같은 앱으로 업데이트할 수 없습니다. 기존 앱을 지우고 새로 설치해야 하고, 그러면 저장된 로그인과 QR도 함께 지워집니다. 키 파일(`release.jks`)과 `keystore.properties`는 꼭 따로 백업해 두세요.
+
+설치 파일은 [Releases](https://github.com/Nakyungwon/phoenix-easy-qr/releases)에서 받을 수 있습니다.
+
 ### iOS
 
 1. 아이폰을 맥에 연결하고 "이 컴퓨터를 신뢰"를 누릅니다.
