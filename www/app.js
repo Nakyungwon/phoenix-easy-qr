@@ -140,9 +140,10 @@ function updateQrFloat() {
   float.hidden = !$('#floatOn').checked || !scrolled || qrFloatClosed || $('#qrImg').hidden;
   $('#qr').classList.toggle('floating', !float.hidden);
   if (float.hidden) return;
-  // 원래 QR 박스의 문서 위치가 곧 맨 위에서 보이던 화면 위치다. 화면보다 아래에 있었으면 화면 안으로 끌어올린다.
+  // 원래 QR 박스의 문서 위치가 곧 맨 위에서 보이던 화면 위치다. 화면보다 아래에 있었으면
+  // 아래 닫기 버튼(40px + 간격 8px)까지 보이도록 화면 안으로 끌어올린다.
   const box = $('#qr').getBoundingClientRect();
-  const top = Math.max(0, Math.min(box.top + window.scrollY, window.innerHeight - box.height));
+  const top = Math.max(0, Math.min(box.top + window.scrollY, window.innerHeight - box.height - 56));
   Object.assign(float.style, { top: `${top}px`, left: `${box.left}px`, width: `${box.width}px`, height: `${box.height}px` });
 }
 window.addEventListener('scroll', updateQrFloat, { passive: true });

@@ -119,7 +119,8 @@
   /* 떠 있는 동안 원래 QR 자리는 비워 둔다. 스크롤하면 QR 두 개가 겹쳐 보이지 않게 한다. */
   .qr-box.floating { visibility: hidden; }
   .qr-float img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
-  .qr-float-close { position: absolute; top: -12px; right: -12px; width: 40px; height: 40px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: var(--primary-deep); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(15, 42, 95, .3); }
+  /* 닫기 버튼은 QR 카드 바깥 아래에 둔다. QR 위나 여백(quiet zone)에 겹치면 스캐너가 못 읽을 수 있다. */
+  .qr-float-close { position: absolute; top: calc(100% + 8px); left: 0; right: 0; width: max-content; margin: 0 auto; min-height: 0; height: 40px; padding: 0 18px; border: 0; border-radius: 20px; background: var(--primary-deep); color: #fff; font-size: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(15, 42, 95, .3); }
 
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation-duration: 1.5s !important; }
@@ -200,7 +201,7 @@
 </main>
 <div class="qr-float" id="qrFloat" hidden>
   <img id="qrFloatImg" alt="입장 QR">
-  <button class="qr-float-close" id="qrFloatClose" aria-label="떠 있는 QR 닫기">×</button>
+  <button class="qr-float-close" id="qrFloatClose" aria-label="떠 있는 QR 닫기">× 닫기</button>
 </div>
 <script src="season.js"></script>
 <script src="vault.js"></script>
