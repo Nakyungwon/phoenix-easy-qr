@@ -66,7 +66,6 @@ async function apply(info) {
     fngprtRegYn: 'N',
     qrViewYn: '',
   };
-  showTicket(body);
   localStorage.setItem(TICKET_KEY, JSON.stringify(body));
   const res = await api('/api/reservation/pyeongchang/snowpark/season/updateFngprtRegDttm', {
     method: 'POST',
@@ -84,10 +83,6 @@ async function getIssueNo() {
   const info = await fetchSeasonInfo();
   if (!info.mpSstkIssueNo) throw new Error(`QR 번호가 없어요 (${info.mpSstkIssueResult || '사유 없음'})`);
   return info.mpSstkIssueNo;
-}
-
-function showTicket(ticket) {
-  $('#ticket').textContent = JSON.stringify(ticket, null, 2);
 }
 
 // 티켓 카드 머리글은 로그인한 계정의 시즌패스 페이지 값으로만 채운다. 로그아웃 상태면 비운다.
@@ -124,7 +119,20 @@ function showQr(qr) {
   $('#qrImg').alt = qr ? `입장 QR ${qr.issueNo}` : '';
   $('#issueNo').textContent = qr ? qr.issueNo : '';
   $('#valid').innerHTML = qr ? '<span class="chip">오늘 23:59까지 유효</span>' : '';
+  $('#qrFloatImg').src = qr ? qr.img : '';
+  updateQrFloat();
 }
+
+// QR 박스가 절반 넘게 화면 밖으로 나가고 오늘 QR이 있을 때만 떠 있는 QR을 보여준다.
+let qrOffscreen = false;
+function updateQrFloat() {
+  $('#qrFloat').hidden = !qrOffscreen || $('#qrImg').hidden;
+}
+new IntersectionObserver(([entry]) => {
+  qrOffscreen = entry.intersectionRatio < 0.5;
+  updateQrFloat();
+}, { threshold: 0.5 }).observe($('#qr'));
+$('#qrFloat').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
 async function run(button, label, task) {
   button.disabled = true;
@@ -289,8 +297,6 @@ $('#clear').onclick = () => {
   if ($('#lockWp').checked) run($('#clear'), '잠금화면 복원', () => applyLockScreen(null));
 };
 
-const lastTicket = localStorage.getItem(TICKET_KEY);
-if (lastTicket) showTicket(JSON.parse(lastTicket));
 // QR은 KST 자정에 무효가 된다. 앱을 켜둔 채 자정을 넘기거나 다음 날 앱으로 돌아오면 지난 QR을 앱과 잠금화면에서 내린다.
 function expireOldQr() {
   const saved = JSON.parse(localStorage.getItem(QR_KEY) || 'null');
