@@ -123,15 +123,16 @@ function showQr(qr) {
   updateQrFloat();
 }
 
-// QR 박스가 절반 넘게 화면 밖으로 나가고 오늘 QR이 있을 때만 떠 있는 QR을 보여준다.
+// 오늘 QR이 있으면 스크롤 중에도 QR이 늘 보이게 한다. QR 박스가 조금이라도 화면 밖으로 나가는 순간 떠 있는 QR을 보여준다.
+// 0.99: 소수점 반올림 때문에 다 보이는데도 비율이 1이 안 되는 경우가 있다.
 let qrOffscreen = false;
 function updateQrFloat() {
   $('#qrFloat').hidden = !qrOffscreen || $('#qrImg').hidden;
 }
 new IntersectionObserver(([entry]) => {
-  qrOffscreen = entry.intersectionRatio < 0.5;
+  qrOffscreen = entry.intersectionRatio < 0.99;
   updateQrFloat();
-}, { threshold: 0.5 }).observe($('#qr'));
+}, { threshold: 0.99 }).observe($('#qr'));
 $('#qrFloat').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
 async function run(button, label, task) {
