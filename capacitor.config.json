@@ -1,0 +1,8 @@
+{
+  "appId": "com.kwna.phoenixqr",
+  "appName": "휘팍 이지 QR",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

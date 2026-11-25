@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A5F">
+<title>휘팍 이지 QR</title>
+<style>
+  :root {
+    --primary: #1E3A8A;
+    --primary-deep: #0F2A5F;
+    --sky: #3B82F6;
+    --bg: #EFF6FF;
+    --card: #FFFFFF;
+    --text: #0F172A;
+    --muted: #475569;
+    --border: #BFDBFE;
+    --danger: #DC2626;
+    --ok: #15803D;
+    --radius: 20px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0B1220;
+      --card: #111A2E;
+      --text: #E2E8F0;
+      --muted: #94A3B8;
+      --border: #1E3A5F;
+      --danger: #F87171;
+      --ok: #4ADE80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 -apple-system, system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  main {
+    max-width: 420px;
+    margin: 0 auto;
+    /* 안드로이드 웹뷰에서 safe-area 값이 0으로 오는 경우가 있어 상태바 높이만큼 최소 여백을 둔다 */
+    padding: calc(max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px), 32px) + 16px) 16px calc(max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)) + 32px);
+    display: grid;
+    gap: 16px;
+  }
+  header .eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--sky); }
+  header h1 { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+
+  /* 티켓 카드 */
+  .ticket { background: var(--card); border-radius: var(--radius); overflow: hidden; box-shadow: 0 8px 24px rgba(15, 42, 95, .12); }
+  .ticket-head { background: linear-gradient(135deg, var(--primary-deep), var(--primary) 60%, var(--sky)); color: #fff; padding: 18px 20px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .ticket-head .season { font-size: 13px; opacity: .85; }
+  .ticket-head .name { font-size: 20px; font-weight: 700; }
+  .ticket-head .no { font: 600 13px ui-monospace, monospace; opacity: .9; text-align: right; }
+  .ticket-body { padding: 20px; display: grid; justify-items: center; gap: 12px; position: relative; }
+  .ticket-body::before { content: ''; position: absolute; top: 0; left: 20px; right: 20px; border-top: 2px dashed var(--border); }
+  /* QR은 다크 모드에서도 흰 바탕이어야 스캐너가 읽는다 */
+  .qr-box { width: 100%; max-width: 280px; aspect-ratio: 1; background: #fff; border-radius: 12px; padding: 12px; display: grid; place-items: center; }
+  .qr-box img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .qr-empty { color: #64748B; text-align: center; font-size: 14px; display: grid; justify-items: center; gap: 10px; width: 100%; padding: 0 8px; }
+  .qr-empty svg { width: 48px; height: 48px; color: #94A3B8; }
+  .qr-empty .btn-primary { margin-top: 6px; }
+  .issue-no { font: 600 15px ui-monospace, monospace; letter-spacing: .08em; color: var(--muted); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  .chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+  /* 버튼 */
+  button { font: inherit; font-weight: 700; min-height: 52px; border-radius: 14px; border: 0; cursor: pointer; transition: transform .12s, opacity .2s, background .2s; }
+  button:active { transform: scale(.98); }
+  button:disabled { opacity: .55; cursor: default; }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+  .btn-primary { background: var(--primary); color: #fff; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
+  .btn-small { min-height: 44px; padding: 0 18px; font-size: 14px; }
+  .spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255, 255, 255, .4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+  .busy .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 로그인 카드 */
+  .card { background: var(--card); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border); }
+  .card-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .card-row h2 { margin: 0; font-size: 16px; }
+  .badge { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .badge.on { color: var(--ok); }
+  .badge.on::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
+  .account { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+  .avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); display: grid; place-items: center; }
+  .avatar svg { width: 22px; height: 22px; }
+  .account .who { flex: 1; min-width: 0; }
+  .account .who strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .account .who span { font-size: 13px; color: var(--muted); }
+  .account .btn-ghost { min-height: 44px; padding: 0 16px; font-size: 14px; }
+  [hidden] { display: none !important; }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 12px 0 6px; }
+  input { width: 100%; min-height: 50px; padding: 0 14px; font: inherit; color: var(--text); background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px; }
+  input:focus { border-color: var(--sky); outline: none; }
+  form button { margin-top: 16px; }
+  .checks { display: flex; gap: 20px; margin-top: 14px; }
+  .check { display: inline-flex; align-items: center; gap: 8px; margin: 0; min-height: 44px; font-size: 14px; color: var(--text); font-weight: 500; cursor: pointer; }
+  .check input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--primary); }
+
+  #msg { margin: 0; min-height: 1.5em; text-align: center; font-size: 14px; color: var(--muted); white-space: pre-line; }
+  #msg.error { color: var(--danger); }
+
+  details { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 20px; }
+  summary { min-height: 48px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  pre { margin: 0 0 16px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; background: var(--bg); padding: 12px; border-radius: 10px; color: var(--text); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation-duration: 1.5s !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">휘팍 이지 QR</p>
+    <h1>시즌패스 입장 QR</h1>
+  </header>
+
+  <section class="ticket" aria-label="입장 QR">
+    <div class="ticket-head">
+      <div>
+        <div class="season" id="season">시즌패스</div>
+        <div class="name" id="holder">로그인 전</div>
+      </div>
+      <div class="no" id="ticketNo"></div>
+    </div>
+    <div class="ticket-body">
+      <div class="qr-box" id="qr">
+        <img id="qrImg" alt="" hidden>
+        <div class="qr-empty" id="qrEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+            <path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>
+          </svg>
+          오늘 받은 QR이 없어요
+          <button class="btn-primary" id="get"><span class="spinner" aria-hidden="true"></span>QR 받기</button>
+        </div>
+      </div>
+      <div class="issue-no" id="issueNo"></div>
+      <div id="valid"></div>
+      <button class="btn-ghost btn-small" id="clear" hidden>QR 초기화</button>
+    </div>
+  </section>
+  <p id="msg" role="status" aria-live="polite"></p>
+
+  <section class="card">
+    <div class="card-row">
+      <h2>휘닉스 계정</h2>
+      <span class="badge" id="loginState">로그인 전</span>
+    </div>
+    <form id="f">
+      <label for="id">아이디</label>
+      <input id="id" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+      <label for="pw">비밀번호</label>
+      <input id="pw" type="password" autocomplete="current-password" required>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="saveCreds">아이디/비번 저장</label>
+        <label class="check"><input type="checkbox" id="autoLogin">자동 로그인</label>
+      </div>
+      <button class="btn-primary" id="loginBtn"><span class="spinner" aria-hidden="true"></span>로그인</button>
+    </form>
+    <div class="account" id="account" hidden>
+      <div class="avatar" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+      </div>
+      <div class="who">
+        <strong id="who"></strong>
+        <span id="whoSub"></span>
+      </div>
+      <button class="btn-ghost" id="logout">로그아웃</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-row">
+      <h2>잠금화면 QR</h2>
+      <span class="badge" id="wpState"></span>
+    </div>
+    <label class="check"><input type="checkbox" id="lockWp"><span id="lockWpLabel">잠금화면 배경에 오늘 QR 띄우기</span></label>
+  </section>
+
+  <details>
+    <summary>티켓 설정 (마지막 신청 값)</summary>
+    <pre id="ticket">아직 신청한 적 없음</pre>
+  </details>
+</main>
+<script src="season.js"></script>
+<script src="vault.js"></script>
+<script src="wallpaper.js"></script>
+<script>
+  // 앱에서는 Capacitor가 fetch를 네이티브 HTTP로 바꿔 보내므로 CORS가 없고, 쿠키(JSESSIONID)도 네이티브 쿠키 저장소가 알아서 붙인다.
+  const BASE = 'https://phoenixhnr.co.kr';
+  // QR은 KST 자정까지만 유효하다. 받은 QR 번호를 날짜와 함께 둔다.
+  const QR_KEY = 'qr';
+  // 마지막으로 신청 API에 보낸 값. 화면 확인용이다.
+  const TICKET_KEY = 'lastTicket';
+  const kstToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+  const nextMidnight = () => Date.parse(`${kstToday()}T00:00:00+09:00`) + 24 * 60 * 60 * 1000;
+  const $ = (s) => document.querySelector(s);
+  const NEED_LOGIN = '로그인이 필요해요';
+
+  // 저장된 오늘 QR { date, issueNo, img }. 날짜가 지났으면 null.
+  const todayQr = () => {
+    const saved = JSON.parse(localStorage.getItem(QR_KEY) || 'null');
+    return saved && saved.date === kstToday() && saved.img ? saved : null;
+  };
+
+  // 서버 메시지에 섞여 오는 HTML(<br>, </br>, &nbsp; 등)을 줄바꿈이 살아 있는 평문으로 바꾼다.
+  const plainText = (html) => {
+    const withBreaks = String(html).replace(/<\/?br\s*\/?>/gi, '\n');
+    return new DOMParser().parseFromString(withBreaks, 'text/html').body.textContent.trim();
+  };
+
+  async function login(id, pw) {
+    const form = new FormData();
+    form.append('mbNo', id);
+    form.append('mbPw', pw);
+    const res = await fetch(`${BASE}/api/member/login`, { method: 'POST', body: form });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.logged !== 'Y') throw new Error(body.msg ? plainText(body.msg) : `로그인 실패 (${res.status})`);
+  }
+
+  async function fetchSeasonInfo() {
+    const res = await fetch(`${BASE}/m/page/mypage/history/snowpark`);
+    if (res.status === 401) throw new Error(NEED_LOGIN);
+    if (!res.ok) throw new Error(`시즌패스 페이지 실패 (${res.status})`);
+    const info = parseSeasonInfo(await res.text());
+    showHolder(info);
+    return info;
+  }
+
+  // 페이지의 seasonInfo를 보내되, 이전 발급 결과 필드는 미발급 상태로 비워서 보낸다. 실패하면 응답의 responseMessage에 사유가 온다.
+  async function apply(info) {
+    const body = {
+      ...info,
+      custNo: String(info.custNo),
+      mpSstkIssueNo: '',
+      mpSstkIssueResult: '',
+      ordrBarCd: '',
+      fngprtRegYn: 'N',
+      qrViewYn: '',
+    };
+    showTicket(body);
+    localStorage.setItem(TICKET_KEY, JSON.stringify(body));
+    const res = await fetch(`${BASE}/api/reservation/pyeongchang/snowpark/season/updateFngprtRegDttm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 401) throw new Error(NEED_LOGIN);
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || result.responseMessage) throw new Error(`QR 신청 실패 (${res.status}): ${plainText(result.responseMessage || '')}`);
+  }
+
+  // 페이지의 fngprtRegYn/QR 번호가 자정에 초기화되는지 알 수 없어서, 그날 첫 QR 받기는 항상 신청부터 한다.
+  async function getIssueNo() {
+    await apply(await fetchSeasonInfo());
+    const info = await fetchSeasonInfo();
+    if (!info.mpSstkIssueNo) throw new Error(`QR 번호가 없어요 (${info.mpSstkIssueResult || '사유 없음'})`);
+    return info.mpSstkIssueNo;
+  }
+
+  function showTicket(ticket) {
+    $('#ticket').textContent = JSON.stringify(ticket, null, 2);
+  }
+
+  // 티켓 카드 머리글은 로그인한 계정의 시즌패스 페이지 값으로만 채운다. 로그아웃 상태면 비운다.
+  function showHolder(info) {
+    $('#season').textContent = (info && info.sesnDivNm) || '시즌패스';
+    $('#holder').textContent = info ? info.showKorCustNm || '-' : '로그인 전';
+    $('#ticketNo').textContent = (info && info.viewTcktNo) || '';
+  }
+
+  // 사이트와 같은 QR 이미지를 받아 data URL로 바꾼다. 직접 그리면 마스크 패턴이 달라져 모양이 달라진다.
+  // api.qrserver.com이 CORS를 허용(Access-Control-Allow-Origin: *)해서 캔버스로 옮겨 저장할 수 있다.
+  function fetchQrImage(issueNo) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('QR 이미지를 불러오지 못했어요'));
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?qzone=1&data=' + encodeURIComponent(issueNo);
+    });
+  }
+
+  // QR이 없으면 QR 자리에 받기 버튼을, 있으면 QR과 초기화 버튼을 보여준다.
+  function showQr(qr) {
+    $('#qrImg').hidden = !qr;
+    $('#qrEmpty').hidden = !!qr;
+    $('#clear').hidden = !qr;
+    $('#qrImg').src = qr ? qr.img : '';
+    $('#qrImg').alt = qr ? `입장 QR ${qr.issueNo}` : '';
+    $('#issueNo').textContent = qr ? qr.issueNo : '';
+    $('#valid').innerHTML = qr ? '<span class="chip">오늘 23:59까지 유효</span>' : '';
+  }
+
+  async function run(button, label, task) {
+    button.disabled = true;
+    button.classList.add('busy');
+    $('#msg').className = '';
+    $('#msg').textContent = `${label} 중...`;
+    try {
+      await task();
+      $('#msg').textContent = '';
+    } catch (err) {
+      $('#msg').className = 'error';
+      $('#msg').textContent = err.message;
+      // 세션이 끊겼으면 로그인 화면으로 되돌린다.
+      if (err.message === NEED_LOGIN) setLoggedIn(null);
+    } finally {
+      button.disabled = false;
+      button.classList.remove('busy');
+    }
+  }
+
+  // 체크박스 상태. 자동 로그인은 저장된 아이디/비번이 있어야 하므로 저장을 함께 켠다.
+  const OPTS_KEY = 'loginOpts';
+  const opts = JSON.parse(localStorage.getItem(OPTS_KEY) || '{"save":false,"auto":false}');
+  const syncOpts = () => {
+    $('#saveCreds').checked = opts.save;
+    $('#autoLogin').checked = opts.auto;
+    localStorage.setItem(OPTS_KEY, JSON.stringify(opts));
+  };
+  $('#saveCreds').onchange = (e) => {
+    opts.save = e.target.checked;
+    if (!opts.save) {
+      opts.auto = false;
+      vault.clear();
+    }
+    syncOpts();
+  };
+  $('#autoLogin').onchange = (e) => {
+    opts.auto = e.target.checked;
+    if (opts.auto) opts.save = true;
+    syncOpts();
+  };
+
+  // 자동 로그인이 켜져 있으면 세션 만료나 오류가 났을 때 저장된 아이디/비번으로 다시 로그인하고 한 번 더 시도한다.
+  async function withRelogin(task) {
+    try {
+      return await task();
+    } catch (err) {
+      const creds = opts.auto ? await vault.load() : null;
+      if (!creds) throw err;
+      await login(creds.id, creds.pw);
+      setLoggedIn(creds.id);
+      return task();
+    }
+  }
+
+  function doLogin() {
+    return run($('#loginBtn'), '로그인', async () => {
+      const id = $('#id').value.trim();
+      const pw = $('#pw').value;
+      await login(id, pw);
+      if (opts.save) await vault.save({ id, pw });
+      setLoggedIn(id);
+      // 머리글 정보만 채우는 용도라 실패해도 로그인은 성공으로 둔다.
+      await fetchSeasonInfo().catch(() => {});
+    });
+  }
+
+  // 로그인 세션은 앱 메모리 기준이다. Capacitor가 앱 시작 때 세션 쿠키를 지우므로 앱을 새로 열면 로그인 전 상태가 맞다.
+  function setLoggedIn(id) {
+    if (!id) showHolder(null);
+    $('#f').hidden = !!id;
+    $('#account').hidden = !id;
+    $('#loginState').textContent = id ? '로그인됨' : '로그인 전';
+    $('#loginState').classList.toggle('on', !!id);
+    $('#who').textContent = id || '';
+    $('#whoSub').textContent = opts.auto ? '자동 로그인 켜짐' : opts.save ? '아이디/비번 저장됨' : '';
+  }
+
+  // 저장된 아이디/비번과 자동 로그인 설정은 그대로 둔다. 서버 세션만 끊는다.
+  $('#logout').onclick = async () => {
+    await fetch(`${BASE}/api/member/logout`).catch(() => {});
+    setLoggedIn(null);
+    $('#msg').className = '';
+    $('#msg').textContent = '로그아웃했어요';
+  };
+
+  $('#f').onsubmit = (e) => {
+    e.preventDefault();
+    doLogin();
+  };
+
+  // 잠금화면 QR. 안드로이드는 잠금화면 배경을, iOS는 실시간 현황(라이브 액티비티)을 쓴다.
+  // 켜져 있으면 오늘 QR을 받을 때마다 갱신하고, 끄거나 QR을 초기화하면 내린다(안드로이드는 홈 배경과 같게 되돌림).
+  const WP_KEY = 'lockWallpaper';
+  // 잠금화면에 올라가 있는 QR의 날짜. 다음 날 앱을 열면 이걸 보고 지난 QR을 내린다.
+  const LOCK_DATE_KEY = 'lockQrDate';
+  const platform = window.Capacitor ? Capacitor.getPlatform() : 'web';
+  const plugins = window.Capacitor ? Capacitor.Plugins : {};
+  const loadImage = (src) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+
+  async function applyLockScreen(qr) {
+    const ticket = JSON.parse(localStorage.getItem(TICKET_KEY) || 'null');
+    const title = [ticket && ticket.sesnDivNm, ticket && ticket.showKorCustNm].filter(Boolean).join(' · ') || '휘팍 이지 QR';
+    if (platform === 'android') {
+      if (!qr) await plugins.LockWallpaper.clear();
+      else await plugins.LockWallpaper.set({
+        dataUrl: composeLockWallpaper({ qrImg: await loadImage(qr.img), issueNo: qr.issueNo, date: qr.date, ticket }),
+        // 앱이 꺼져 있어도 자정에 시스템 알람으로 잠금화면 배경을 되돌린다.
+        clearAt: nextMidnight(),
+      });
+    } else if (platform === 'ios') {
+      if (!qr) await plugins.LiveActivity.end();
+      else await plugins.LiveActivity.start({
+        ...readQrModules(await loadImage(qr.img)),
+        issueNo: qr.issueNo,
+        validUntil: `${qr.date} 23:59까지 유효`,
+        title,
+        staleAt: Date.parse(`${qr.date}T23:59:59+09:00`),
+      });
+    } else {
+      throw new Error('앱에서만 잠금화면에 띄울 수 있어요');
+    }
+    if (qr) localStorage.setItem(LOCK_DATE_KEY, qr.date);
+    else localStorage.removeItem(LOCK_DATE_KEY);
+    $('#wpState').textContent = qr ? `${qr.date} QR 적용됨` : '';
+    $('#wpState').classList.toggle('on', !!qr);
+  }
+
+  if (platform === 'ios') $('#lockWpLabel').textContent = '잠금화면 실시간 현황에 오늘 QR 띄우기';
+  $('#lockWp').checked = localStorage.getItem(WP_KEY) === 'on';
+  $('#lockWp').onchange = (e) => {
+    const on = e.target.checked;
+    localStorage.setItem(WP_KEY, on ? 'on' : 'off');
+    run(e.target, on ? '잠금화면 설정' : '잠금화면 복원', () => applyLockScreen(on ? todayQr() : null));
+  };
+
+  $('#get').onclick = () => run($('#get'), 'QR 받는', async () => {
+    // 오늘 받은 QR 이미지가 저장돼 있으면 네트워크 없이 바로 보여준다.
+    let qr = todayQr();
+    if (!qr) {
+      const issueNo = await withRelogin(getIssueNo);
+      qr = { date: kstToday(), issueNo, img: await fetchQrImage(issueNo) };
+      localStorage.setItem(QR_KEY, JSON.stringify(qr));
+      if ($('#lockWp').checked) await applyLockScreen(qr);
+    }
+    showQr(qr);
+  });
+
+  // 초기화하면 다음 QR 받기에서 페이지부터 다시 확인한다.
+  $('#clear').onclick = () => {
+    localStorage.removeItem(QR_KEY);
+    showQr(null);
+    $('#msg').className = '';
+    $('#msg').textContent = 'QR을 초기화했어요';
+    if ($('#lockWp').checked) run($('#clear'), '잠금화면 복원', () => applyLockScreen(null));
+  };
+
+  const lastTicket = localStorage.getItem(TICKET_KEY);
+  if (lastTicket) showTicket(JSON.parse(lastTicket));
+  // QR은 KST 자정에 무효가 된다. 앱을 켜둔 채 자정을 넘기거나 다음 날 앱으로 돌아오면 지난 QR을 앱과 잠금화면에서 내린다.
+  function expireOldQr() {
+    const saved = JSON.parse(localStorage.getItem(QR_KEY) || 'null');
+    if (saved && saved.date !== kstToday()) localStorage.removeItem(QR_KEY);
+    showQr(todayQr());
+    const lockDate = localStorage.getItem(LOCK_DATE_KEY);
+    if (lockDate && lockDate !== kstToday()) run($('#clear'), '지난 잠금화면 QR 정리', () => applyLockScreen(null));
+  }
+  // 백그라운드에서는 타이머가 멈출 수 있어 앱으로 돌아올 때(visibilitychange)도 확인한다.
+  function scheduleMidnight() {
+    setTimeout(() => {
+      expireOldQr();
+      scheduleMidnight();
+    }, nextMidnight() - Date.now() + 1000);
+  }
+  // 자동 로그인일 때, 앱으로 돌아왔는데 오늘 QR이 아직 없으면 세션을 미리 확인해 둔다. 끊겼으면 다시 로그인한다.
+  // 시즌패스 페이지 전체를 받는 요청이라 5분 간격으로만, QR을 받을 가능성이 있을 때만 한다.
+  const SESSION_CHECK_MS = 5 * 60 * 1000;
+  let lastSessionCheck = Date.now();
+  async function refreshSession() {
+    if (!opts.auto || todayQr() || Date.now() - lastSessionCheck < SESSION_CHECK_MS) return;
+    lastSessionCheck = Date.now();
+    try {
+      await withRelogin(fetchSeasonInfo);
+    } catch {
+      setLoggedIn(null);
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    expireOldQr();
+    refreshSession();
+  });
+  expireOldQr();
+  scheduleMidnight();
+
+  syncOpts();
+  if (opts.save) {
+    vault.load().then((creds) => {
+      if (!creds) return;
+      $('#id').value = creds.id;
+      $('#pw').value = creds.pw;
+      if (opts.auto) doLogin();
+    });
+  }
+</script>
+</body>
+</html>
