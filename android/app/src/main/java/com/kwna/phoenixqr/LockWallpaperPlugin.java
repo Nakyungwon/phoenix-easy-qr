@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -15,6 +16,27 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 // 잠금화면 배경만 바꾼다(홈 화면 배경은 그대로). 이미지는 웹 쪽 캔버스에서 만들어 PNG data URL로 넘겨받는다.
 @CapacitorPlugin(name = "LockWallpaper")
 public class LockWallpaperPlugin extends Plugin {
+
+    // 앱 바로가기(res/xml/shortcuts.xml)의 intent action과 웹 화면에 넘기는 이름.
+    private static final String ACTION_PREFIX = "com.kwna.phoenixqr.shortcut.";
+    private static String pendingShortcut;
+
+    // 바로가기로 열렸으면 처리할 동작을 기억해 둔다. 최근 앱 목록에서 다시 열면 처음 intent가 다시 오므로 무시한다.
+    static boolean offerShortcut(Intent intent) {
+        if (intent == null || intent.getAction() == null || !intent.getAction().startsWith(ACTION_PREFIX)) return false;
+        if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return false;
+        pendingShortcut = intent.getAction().substring(ACTION_PREFIX.length());
+        return true;
+    }
+
+    // 웹 화면이 시작 처리를 마친 뒤 부른다. 한 번 넘기면 비운다.
+    @PluginMethod
+    public void takeShortcut(PluginCall call) {
+        JSObject result = new JSObject();
+        if (pendingShortcut != null) result.put("action", pendingShortcut);
+        pendingShortcut = null;
+        call.resolve(result);
+    }
 
     @PluginMethod
     public void set(PluginCall call) {

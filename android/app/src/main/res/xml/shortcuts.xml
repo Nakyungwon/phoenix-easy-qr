@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- action 끝부분(lock-on 등)이 웹 화면(app.js handleShortcut)에 넘어가는 동작 이름이다. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="lock_on"
+        android:icon="@drawable/ic_shortcut_lock_on"
+        android:shortcutShortLabel="@string/shortcut_lock_on">
+        <intent
+            android:action="com.kwna.phoenixqr.shortcut.lock-on"
+            android:targetPackage="com.kwna.phoenixqr"
+            android:targetClass="com.kwna.phoenixqr.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="lock_off"
+        android:icon="@drawable/ic_shortcut_lock_off"
+        android:shortcutShortLabel="@string/shortcut_lock_off">
+        <intent
+            android:action="com.kwna.phoenixqr.shortcut.lock-off"
+            android:targetPackage="com.kwna.phoenixqr"
+            android:targetClass="com.kwna.phoenixqr.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="get_qr"
+        android:icon="@drawable/ic_shortcut_qr"
+        android:shortcutShortLabel="@string/shortcut_get_qr">
+        <intent
+            android:action="com.kwna.phoenixqr.shortcut.get-qr"
+            android:targetPackage="com.kwna.phoenixqr"
+            android:targetClass="com.kwna.phoenixqr.MainActivity" />
+    </shortcut>
+</shortcuts>

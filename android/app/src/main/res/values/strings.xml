@@ -4,4 +4,7 @@
     <string name="title_activity_main">휘팍 이지 QR</string>
     <string name="package_name">com.kwna.phoenixqr</string>
     <string name="custom_url_scheme">com.kwna.phoenixqr</string>
+    <string name="shortcut_lock_on">잠금화면 QR 켜기</string>
+    <string name="shortcut_lock_off">잠금화면 QR 끄기</string>
+    <string name="shortcut_get_qr">오늘 QR 받기</string>
 </resources>

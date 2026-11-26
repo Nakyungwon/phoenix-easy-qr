@@ -343,28 +343,33 @@ $('#lockWp').onchange = (e) => {
 const LAST_ISSUE_KEY = 'lastIssue';
 const rememberIssue = (qr) => localStorage.setItem(LAST_ISSUE_KEY, JSON.stringify({ date: qr.date, issueNo: qr.issueNo }));
 
-$('#get').onclick = () => run($('#get'), 'QR 받는', async () => {
-  // 오늘 받은 QR 이미지가 저장돼 있으면 네트워크 없이 바로 보여준다.
-  let qr = todayQr();
-  if (!qr) {
-    const issueNo = await withRelogin(getIssueNo);
-    qr = { date: kstToday(), issueNo, img: await fetchQrImage(issueNo) };
-    const last = JSON.parse(localStorage.getItem(LAST_ISSUE_KEY) || 'null');
-    // 어제 번호와 같으면 보여주기만 하고 오늘 QR로 저장하지 않는다. 그래야 다음에 누를 때 휘닉스에 다시 확인한다.
-    // 같은 번호가 게이트에서 통과될 수도 있어서 막지는 않는다.
-    if (last && last.date !== qr.date && last.issueNo === issueNo) return showQr(qr, true);
-    localStorage.setItem(QR_KEY, JSON.stringify(qr));
-    rememberIssue(qr);
-    if ($('#lockWp').checked) await applyLockScreen(qr);
-  }
-  showQr(qr);
+// 휘닉스에서 오늘 QR을 받아 저장한다. 어제 번호와 같으면 stale로 돌려주고 저장하지 않는다.
+// 그래야 다음에 받을 때 휘닉스에 다시 확인한다. 같은 번호가 게이트에서 통과될 수도 있어서 막지는 않는다.
+async function fetchTodayQr() {
+  const issueNo = await withRelogin(getIssueNo);
+  const qr = { date: kstToday(), issueNo, img: await fetchQrImage(issueNo) };
+  const last = JSON.parse(localStorage.getItem(LAST_ISSUE_KEY) || 'null');
+  if (last && last.date !== qr.date && last.issueNo === issueNo) return { qr, stale: true };
+  localStorage.setItem(QR_KEY, JSON.stringify(qr));
+  rememberIssue(qr);
+  return { qr, stale: false };
+}
+
+// 오늘 받은 QR 이미지가 저장돼 있으면 네트워크 없이 바로 보여준다.
+const getQr = () => run($('#get'), 'QR 받는', async () => {
+  const saved = todayQr();
+  if (saved) return showQr(saved);
+  const { qr, stale } = await fetchTodayQr();
+  showQr(qr, stale);
+  if (!stale && $('#lockWp').checked) await applyLockScreen(qr);
 });
+$('#get').onclick = getQr;
 
 // 초기화하면 다음 QR 받기에서 페이지부터 다시 확인한다.
 $('#clear').onclick = () => {
   if (staleShown) {
     showQr(null);
-    $('#get').click();
+    getQr();
     return;
   }
   localStorage.removeItem(QR_KEY);
@@ -409,7 +414,7 @@ async function refreshSession() {
 // 설정에서 켜면, 날이 바뀐 뒤 앱(웹)을 열 때 QR까지 받는다. 자동 로그인이 켜져 있을 때만 동작한다.
 const autoQrOn = () => opts.auto && opts.autoQr;
 function autoGetQr() {
-  if (autoQrOn() && !todayQr()) $('#get').click();
+  if (autoQrOn() && !todayQr()) return getQr();
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -430,12 +435,45 @@ scheduleMidnight();
 if (platform === 'web' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 syncOpts();
-if (opts.save) {
-  vault.load().then((creds) => {
-    if (!creds) return;
-    $('#id').value = creds.id;
-    $('#pw').value = creds.pw;
-    // 로그인을 마친 뒤 QR 자동 갱신을 한다. 로그인이 실패했으면 QR 받기가 한 번 더 로그인을 시도한다.
-    if (opts.auto) doLogin().then(autoGetQr);
-  });
+async function startup() {
+  if (!opts.save) return;
+  const creds = await vault.load();
+  if (!creds) return;
+  $('#id').value = creds.id;
+  $('#pw').value = creds.pw;
+  if (!opts.auto) return;
+  // 로그인을 마친 뒤 QR 자동 갱신을 한다. 로그인이 실패했으면 QR 받기가 한 번 더 로그인을 시도한다.
+  await doLogin();
+  await autoGetQr();
 }
+
+// 안드로이드 앱 바로가기(아이콘 길게 누르기, 삼성 모드 및 루틴). 네이티브가 어떤 바로가기로 열렸는지 들고 있다가 넘겨준다.
+// 로그인과 겹치지 않게 시작 처리가 끝난 뒤에 실행하고, 앱이 이미 떠 있을 때는 네이티브가 shortcut 이벤트로 알려준다.
+async function handleShortcut() {
+  if (platform !== 'android') return;
+  const { action } = await plugins.LockWallpaper.takeShortcut();
+  if (action === 'get-qr') return getQr();
+  if (action === 'lock-on') return run($('#get'), '잠금화면 QR 켜는', turnLockQrOn);
+  if (action === 'lock-off') return run($('#get'), '잠금화면 QR 끄는', turnLockQrOff);
+}
+// 오늘 QR이 없으면 받아서 잠금화면에 올린다. 어제와 같은 QR이면 올리지 않는다.
+async function turnLockQrOn() {
+  $('#lockWp').checked = true;
+  localStorage.setItem(WP_KEY, 'on');
+  let qr = todayQr();
+  if (!qr) {
+    const result = await fetchTodayQr();
+    showQr(result.qr, result.stale);
+    if (result.stale) throw fail('stale-qr', '어제와 같은 QR이라 잠금화면에 올리지 않았어요. 잠시 후 다시 시도해 주세요.');
+    qr = result.qr;
+  }
+  showQr(qr);
+  await applyLockScreen(qr);
+}
+async function turnLockQrOff() {
+  $('#lockWp').checked = false;
+  localStorage.setItem(WP_KEY, 'off');
+  await applyLockScreen(null);
+}
+window.addEventListener('shortcut', handleShortcut);
+startup().catch(() => {}).then(handleShortcut);

@@ -18,6 +18,8 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 앱 바로가기: 아이콘 길게 누르기, 삼성 모드 및 루틴의 앱 작업 목록에 나온다. -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
         <provider
