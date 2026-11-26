@@ -440,10 +440,9 @@ scheduleMidnight();
 // PWA: 앱 화면을 캐시해서 신호가 없어도 저장된 QR을 띄운다. 앱(Capacitor)에서는 필요 없다.
 if (platform === 'web' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-// PWA 홈 화면 추가 안내. 모바일 브라우저로 열었을 때만 보이고, 홈 화면 아이콘으로 열었으면 보이지 않는다.
+// PWA 홈 화면 추가 안내. 모바일 브라우저로 열었을 때만 설정 창에 보이고, 홈 화면 아이콘으로 열었으면 보이지 않는다.
 // 안드로이드 크롬은 beforeinstallprompt로 진짜 설치 창을 띄운다. 아이폰은 어떤 브라우저도 설치 창을 띄울 수 없어서
-// 브라우저별 메뉴 위치를 안내한다. 아이폰은 홈 화면에 추가했는지 알 수 없어서, 배너를 닫으면 이 브라우저에서는 다시 띄우지 않는다.
-const INSTALL_CLOSED_KEY = 'installBannerClosed';
+// 브라우저별 메뉴 위치를 안내한다.
 const ua = navigator.userAgent;
 const isIos = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isAndroid = /Android/.test(ua);
@@ -466,11 +465,9 @@ function installGuide() {
   if (isAndroid && installPrompt) return { how: '아이콘으로 앱처럼 열 수 있어요', button: true };
   return null;
 }
-function showInstall({ force = false } = {}) {
+function showInstall() {
   const guide = installGuide();
   $('#installSetting').hidden = !guide;
-  const closed = localStorage.getItem(INSTALL_CLOSED_KEY) === '1';
-  $('#installBanner').hidden = !guide || (closed && !force);
   if (!guide) return;
   $('#installHow').textContent = guide.how;
   $('#installBtn').hidden = !guide.button;
@@ -490,17 +487,6 @@ $('#installBtn').onclick = async () => {
   await installPrompt.userChoice;
   installPrompt = null;
   showInstall();
-};
-$('#installClose').onclick = () => {
-  localStorage.setItem(INSTALL_CLOSED_KEY, '1');
-  $('#installBanner').hidden = true;
-};
-// 설정의 '홈 화면에 추가'. 안드로이드는 설치 창을 바로 띄우고, 그 밖에는 닫았던 안내를 다시 보여준다.
-$('#installOpen').onclick = () => {
-  $('#settings').hidden = true;
-  if (installPrompt) return $('#installBtn').onclick();
-  showInstall({ force: true });
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 showInstall();
 
