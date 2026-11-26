@@ -191,12 +191,14 @@ async function run(button, label, task) {
   try {
     await task();
     $('#msg').textContent = '';
+    return true;
   } catch (err) {
     $('#msg').className = 'error';
     $('#msg').textContent = err.message;
     reportError(label, err);
     // 세션이 끊겼으면 로그인 화면으로 되돌린다.
     if (err.message === NEED_LOGIN) setLoggedIn(null);
+    return false;
   } finally {
     button.disabled = false;
     button.classList.remove('busy');
@@ -449,12 +451,17 @@ async function startup() {
 
 // 안드로이드 앱 바로가기(아이콘 길게 누르기, 삼성 모드 및 루틴). 네이티브가 어떤 바로가기로 열렸는지 들고 있다가 넘겨준다.
 // 로그인과 겹치지 않게 시작 처리가 끝난 뒤에 실행하고, 앱이 이미 떠 있을 때는 네이티브가 shortcut 이벤트로 알려준다.
+// 바로가기로 열렸으면 일을 마친 뒤 앱을 뒤로 보내서, 루틴 실행 전에 보던 화면으로 돌아가게 한다.
+// 실패하면 오류 문구를 볼 수 있게 그대로 둔다.
 async function handleShortcut() {
   if (platform !== 'android') return;
   const { action } = await plugins.LockWallpaper.takeShortcut();
-  if (action === 'get-qr') return getQr();
-  if (action === 'lock-on') return run($('#get'), '잠금화면 QR 켜는', turnLockQrOn);
-  if (action === 'lock-off') return run($('#get'), '잠금화면 QR 끄는', turnLockQrOff);
+  const task = {
+    'get-qr': getQr,
+    'lock-on': () => run($('#get'), '잠금화면 QR 켜는', turnLockQrOn),
+    'lock-off': () => run($('#get'), '잠금화면 QR 끄는', turnLockQrOff),
+  }[action];
+  if (task && (await task())) await plugins.LockWallpaper.moveToBack();
 }
 // 오늘 QR이 없으면 받아서 잠금화면에 올린다. 어제와 같은 QR이면 올리지 않는다.
 async function turnLockQrOn() {

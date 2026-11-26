@@ -29,6 +29,13 @@ public class LockWallpaperPlugin extends Plugin {
         return true;
     }
 
+    // 바로가기 작업을 마친 뒤 앱을 뒤로 보낸다(종료가 아님). 루틴 실행 전에 보던 화면이 다시 보인다.
+    @PluginMethod
+    public void moveToBack(PluginCall call) {
+        getActivity().runOnUiThread(() -> getActivity().moveTaskToBack(true));
+        call.resolve();
+    }
+
     // 웹 화면이 시작 처리를 마친 뒤 부른다. 한 번 넘기면 비운다.
     @PluginMethod
     public void takeShortcut(PluginCall call) {
