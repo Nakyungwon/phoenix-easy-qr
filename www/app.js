@@ -142,7 +142,7 @@ function showQr(qr, stale = false) {
 }
 
 // 오늘 QR이 있으면 스크롤해도 QR이 처음 보이던 자리와 크기 그대로 떠 있게 한다.
-// X로 닫으면 맨 위까지 다시 올라갔다가 내려올 때 다시 띄운다. QR 아래 체크박스로 아예 끌 수 있다(기본 켜짐).
+// X로 닫으면 맨 위까지 다시 올라갔다가 내려올 때 다시 띄운다. 설정의 QR 위치 고정으로 아예 끌 수 있다(기본 켜짐).
 const FLOAT_KEY = 'qrFloat';
 $('#floatOn').checked = localStorage.getItem(FLOAT_KEY) !== 'off';
 $('#floatOn').onchange = (e) => {
@@ -209,10 +209,10 @@ const opts = JSON.parse(localStorage.getItem(OPTS_KEY) || '{"save":false,"auto":
 const syncOpts = () => {
   $('#saveCreds').checked = opts.save;
   $('#autoLogin').checked = opts.auto;
-  // QR 자동 받기는 자동 로그인이 켜져 있을 때만 고를 수 있다. 꺼지면 설정값은 두고 동작만 멈춘다.
+  // QR 자동 갱신은 자동 로그인이 켜져 있을 때만 고를 수 있다. 꺼지면 설정값은 두고 동작만 멈춘다.
   $('#autoQr').checked = autoQrOn();
   $('#autoQr').disabled = !opts.auto;
-  $('#autoQrHint').hidden = opts.auto;
+  $('#autoQrHint').textContent = opts.auto ? '날이 바뀐 뒤 처음 열 때 새 QR을 받아요' : '자동 로그인을 켜야 쓸 수 있어요';
   localStorage.setItem(OPTS_KEY, JSON.stringify(opts));
 };
 $('#saveCreds').onchange = (e) => {
@@ -435,7 +435,7 @@ if (opts.save) {
     if (!creds) return;
     $('#id').value = creds.id;
     $('#pw').value = creds.pw;
-    // 로그인을 마친 뒤 QR 자동 받기를 한다. 로그인이 실패했으면 QR 받기가 한 번 더 로그인을 시도한다.
+    // 로그인을 마친 뒤 QR 자동 갱신을 한다. 로그인이 실패했으면 QR 받기가 한 번 더 로그인을 시도한다.
     if (opts.auto) doLogin().then(autoGetQr);
   });
 }
