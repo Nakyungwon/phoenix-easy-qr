@@ -10,8 +10,12 @@ const SESSION_KEY = 'pxSession';
 // 오류에 종류(code)를 붙여 둔다. 화면 문구에는 휘닉스가 보낸 원문이 섞일 수 있어서, 오류 보고에는 종류만 보낸다.
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const RETRY_LATER = new Set([502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527]);
+// PWA 프록시가 휘닉스에 닿지 못하면 새 요청으로 두 번까지 다시 보낸다. 같은 워커 호출 안에서는 계속 실패해도
+// 새 요청은 대부분 성공하는 것을 실측으로 확인했다. 중계하는 경로는 두 번 처리돼도 결과가 같다.
+const PROXY_RETRY = new Set([502, 520, 521, 522, 525]);
 async function api(path, init = {}) {
-  const res = platform === 'web' ? await proxyFetch(path, init) : await fetch(BASE + path, init);
+  let res = platform === 'web' ? await proxyFetch(path, init) : await fetch(BASE + path, init);
+  for (let retry = 0; platform === 'web' && retry < 2 && PROXY_RETRY.has(res.status); retry++) res = await proxyFetch(path, init);
   if (RETRY_LATER.has(res.status)) throw fail(`upstream-${res.status}`, `휘닉스 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요. (${res.status})`);
   if (res.status === 429) throw fail('rate-limit', '요청이 너무 많아요. 1분쯤 뒤에 다시 시도해 주세요.');
   return res;

@@ -65,10 +65,12 @@ async function proxy(request, env, url) {
       headers,
       body: request.method === 'GET' ? undefined : request.body,
       redirect: 'manual',
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
   } catch (err) {
-    // 502로 돌려주면 화면이 "잠시 후 다시 시도"로 안내한다.
-    return blocked(502, `upstream-error: ${err.message}`.slice(0, 200));
+    // 502를 받으면 화면이 새 요청으로 다시 보내고, 그래도 안 되면 "잠시 후 다시 시도"로 안내한다.
+    const failure = err.name === 'TimeoutError' ? `timeout ${UPSTREAM_TIMEOUT_MS}ms` : err.message;
+    return blocked(502, `upstream-error: ${failure}`.slice(0, 200));
   }
 
   // 비밀번호가 담긴 요청 본문은 로그로 남기지 않는다. 응답만 그대로 돌려준다.
@@ -81,6 +83,11 @@ async function proxy(request, env, url) {
   if (cookies.length) out.set('X-Session', mergeCookies(session, cookies));
   return { res: new Response(upstream.body, { status: upstream.status, headers: out }) };
 }
+
+// Cloudflare에서 휘닉스로 가는 연결이 가끔 응답 없이 멈춘다(그대로 두면 20초 뒤 522). 휘닉스 서버 자체는 정상이다.
+// 실측: 같은 워커 호출 안에서 다시 보내도 계속 실패했고, 새 요청은 대부분 성공했다.
+// 그래서 여기서는 빨리 끊기만 하고, 재시도는 화면(app.js api)이 새 요청으로 한다. 휘닉스는 평소 2초 안에 답한다.
+const UPSTREAM_TIMEOUT_MS = 5000;
 
 // 화면(PWA)이 보낸 오류 보고. { action: '로그인', code: 'login-failed-200' } 형태만 받아서 reason으로 남긴다.
 // 아무 글이나 로그에 남지 않도록 길이와 글자를 제한한다.

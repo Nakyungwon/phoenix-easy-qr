@@ -193,6 +193,7 @@ npx @capacitor/assets generate --android --ios --iconBackgroundColor '#1E3A8A'
   - `reason`: 프록시가 막은 이유(`bad-origin`, `rate-limit`, `path-not-allowed`)나 휘닉스 연결 예외(`upstream-error: ...`)입니다.
   - **화면 오류 보고:** PWA 화면에서 오류가 나면 `POST /px/_error`로 동작과 오류 종류만 보내고, `client-error 로그인: login-failed-401`처럼 남습니다. 휘닉스가 보낸 원문은 보내지 않습니다. 오류 종류는 `app.js`에서 `fail(code, message)`로 붙입니다. 앱(안드로이드/iOS)은 보내지 않습니다.
   - **보는 곳:** Cloudflare 대시보드 → Workers & Pages → phoenix-easy-qr → **Logs**. 실시간으로는 `npx wrangler tail`로 봅니다. 화면 파일 요청은 Worker를 거치지 않아서 기록되지 않습니다.
+- **연결 끊김 재시도:** Cloudflare에서 휘닉스로 가는 연결이 가끔 응답 없이 멈춥니다(그대로 두면 20초 뒤 522, 가끔 525). 같은 워커 호출 안에서 다시 보내면 계속 실패하고, 새 요청은 대부분 성공합니다(실측). 그래서 Worker는 5초에 끊고 502를 돌려주고, 화면(`app.js`의 `api`)이 새 요청으로 두 번까지 다시 보냅니다. 중계하는 네 경로는 두 번 처리돼도 결과가 같습니다.
 - **서비스 워커:** 화면 파일을 네트워크에서 먼저 받고, 실패하면(오프라인) 캐시를 씁니다. 그래서 배포하면 다음에 앱을 열 때 바로 새 버전이 뜹니다. `/px/` 요청은 캐시하지 않습니다.
 - **남용 방지:** 앱 화면은 `X-App` 헤더를 붙여 보냅니다. 이 헤더가 없거나 다른 출처를 밝힌 요청은 403으로 막습니다. 다만 스크립트는 둘 다 꾸밀 수 있어서, 실제 방어선은 IP별 요청 제한(분당 20회, `wrangler.toml`)입니다. Cloudflare의 제한은 근사치라 짧은 시간에는 이보다 더 통과할 수 있습니다.
 - **보안 헤더:** `www/_headers`로 CSP(같은 출처 스크립트만 실행), 클릭재킹 방지, `nosniff`, `no-referrer`를 겁니다. 인라인 스크립트가 막히므로 화면 로직은 `www/app.js`에 둡니다.
