@@ -52,6 +52,19 @@
     display: grid;
     gap: 16px;
   }
+  header { position: relative; padding-right: 56px; }
+  .icon-btn { min-height: 0; width: 44px; height: 44px; padding: 10px; border-radius: 12px; background: transparent; color: var(--muted); display: grid; place-items: center; }
+  .icon-btn svg { width: 24px; height: 24px; }
+  header .icon-btn { position: absolute; top: 0; right: 0; }
+  /* 설정 창. <dialog>는 구형 iOS Safari(15.4 미만)에서 동작하지 않아 일반 요소로 띄운다. */
+  .sheet { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 42, .45); }
+  .sheet[hidden] { display: none; }
+  .sheet-panel { width: 100%; max-width: 420px; display: grid; gap: 4px; }
+  .setting { display: grid; gap: 2px; padding: 4px 0; border-top: 1px solid var(--border); }
+  .setting[hidden] { display: none; }
+  .setting .badge { padding-left: 28px; }
+  .hint { margin: 0 0 6px 28px; font-size: 13px; color: var(--muted); }
+  .hint[hidden] { display: none; }
   header .eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--sky); }
   header h1 { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
 
@@ -72,6 +85,8 @@
   .qr-empty .btn-primary { margin-top: 6px; }
   .issue-no { font: 600 15px ui-monospace, monospace; letter-spacing: .08em; color: var(--muted); }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  /* 어제와 같은 QR 경고. color-mix를 모르는 구형 Safari도 있어서 색을 직접 쓴다. */
+  .chip.warn { background: rgba(217, 119, 6, .14); color: #B45309; text-align: left; border-radius: 12px; }
   .chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 
   /* 버튼 */
@@ -132,6 +147,9 @@
   <header>
     <p class="eyebrow">휘팍 이지 QR</p>
     <h1>시즌패스 입장 QR</h1>
+    <button class="icon-btn" id="openSettings" aria-label="설정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
   </header>
 
   <section class="ticket" aria-label="입장 QR">
@@ -156,7 +174,6 @@
       </div>
       <div class="issue-no" id="issueNo"></div>
       <div id="valid"></div>
-      <label class="check" id="floatOpt" hidden><input type="checkbox" id="floatOn">스크롤해도 QR 띄워 두기</label>
       <button class="btn-ghost btn-small" id="clear" hidden>QR 초기화</button>
     </div>
   </section>
@@ -190,15 +207,29 @@
     </div>
   </section>
 
-  <section class="card">
-    <div class="card-row">
-      <h2>잠금화면 QR</h2>
-      <span class="badge" id="wpState"></span>
-    </div>
-    <label class="check"><input type="checkbox" id="lockWp"><span id="lockWpLabel">잠금화면 배경에 오늘 QR 띄우기</span></label>
-  </section>
 
 </main>
+<div class="sheet" id="settings" hidden>
+  <section class="card sheet-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="card-row">
+      <h2 id="settingsTitle">설정</h2>
+      <button class="icon-btn" id="closeSettings" aria-label="설정 닫기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="setting">
+      <label class="check"><input type="checkbox" id="floatOn">스크롤해도 QR 띄워 두기</label>
+    </div>
+    <div class="setting" id="lockSetting">
+      <label class="check"><input type="checkbox" id="lockWp"><span id="lockWpLabel">잠금화면 배경에 오늘 QR 띄우기</span></label>
+      <span class="badge" id="wpState"></span>
+    </div>
+    <div class="setting">
+      <label class="check"><input type="checkbox" id="autoQr">날이 바뀌면 열 때 QR까지 자동으로 받기</label>
+      <p class="hint" id="autoQrHint">자동 로그인을 켜야 쓸 수 있어요</p>
+    </div>
+  </section>
+</div>
 <div class="qr-float" id="qrFloat" hidden>
   <img id="qrFloatImg" alt="입장 QR">
   <button class="qr-float-close" id="qrFloatClose" aria-label="떠 있는 QR 닫기">× 닫기</button>

@@ -123,15 +123,20 @@ function fetchQrImage(issueNo) {
 }
 
 // QR이 없으면 QR 자리에 받기 버튼을, 있으면 QR과 초기화 버튼을 보여준다.
-function showQr(qr) {
+// stale: 날이 바뀌었는데 어제와 같은 번호가 온 경우다. 경고를 띄우고 초기화 버튼을 '다시 받기'로 바꾼다.
+let staleShown = false;
+function showQr(qr, stale = false) {
+  staleShown = !!qr && stale;
   $('#qrImg').hidden = !qr;
   $('#qrEmpty').hidden = !!qr;
   $('#clear').hidden = !qr;
-  $('#floatOpt').hidden = !qr;
+  $('#clear').textContent = staleShown ? '다시 받기' : 'QR 초기화';
   $('#qrImg').src = qr ? qr.img : '';
   $('#qrImg').alt = qr ? `입장 QR ${qr.issueNo}` : '';
   $('#issueNo').textContent = qr ? qr.issueNo : '';
-  $('#valid').innerHTML = qr ? '<span class="chip">오늘 23:59까지 유효</span>' : '';
+  $('#valid').innerHTML = !qr ? ''
+    : staleShown ? '<span class="chip warn">어제와 같은 QR이에요. 휘닉스에서 아직 갱신되지 않았을 수 있어요. 잠시 후 다시 받아 보세요.</span>'
+    : '<span class="chip">오늘 23:59까지 유효</span>';
   $('#qrFloatImg').src = qr ? qr.img : '';
   updateQrFloat();
 }
@@ -204,6 +209,10 @@ const opts = JSON.parse(localStorage.getItem(OPTS_KEY) || '{"save":false,"auto":
 const syncOpts = () => {
   $('#saveCreds').checked = opts.save;
   $('#autoLogin').checked = opts.auto;
+  // QR 자동 받기는 자동 로그인이 켜져 있을 때만 고를 수 있다. 꺼지면 설정값은 두고 동작만 멈춘다.
+  $('#autoQr').checked = autoQrOn();
+  $('#autoQr').disabled = !opts.auto;
+  $('#autoQrHint').hidden = opts.auto;
   localStorage.setItem(OPTS_KEY, JSON.stringify(opts));
 };
 $('#saveCreds').onchange = (e) => {
@@ -219,6 +228,15 @@ $('#autoLogin').onchange = (e) => {
   if (opts.auto) opts.save = true;
   syncOpts();
 };
+$('#autoQr').onchange = (e) => {
+  opts.autoQr = e.target.checked;
+  syncOpts();
+};
+
+// 설정 창. 바깥 어두운 곳을 눌러도 닫힌다.
+$('#openSettings').onclick = () => { $('#settings').hidden = false; };
+$('#closeSettings').onclick = () => { $('#settings').hidden = true; };
+$('#settings').onclick = (e) => { if (e.target === e.currentTarget) $('#settings').hidden = true; };
 
 // 자동 로그인이 켜져 있으면 세션 만료나 오류가 났을 때 저장된 아이디/비번으로 다시 로그인하고 한 번 더 시도한다.
 async function withRelogin(task) {
@@ -313,7 +331,7 @@ async function applyLockScreen(qr) {
 
 if (platform === 'ios') $('#lockWpLabel').textContent = '잠금화면 실시간 현황에 오늘 QR 띄우기';
 // 웹(PWA)은 잠금화면에 아무것도 띄울 수 없다.
-if (platform === 'web') $('#lockWp').closest('.card').hidden = true;
+if (platform === 'web') $('#lockSetting').hidden = true;
 $('#lockWp').checked = localStorage.getItem(WP_KEY) === 'on';
 $('#lockWp').onchange = (e) => {
   const on = e.target.checked;
@@ -321,13 +339,22 @@ $('#lockWp').onchange = (e) => {
   run(e.target, on ? '잠금화면 설정' : '잠금화면 복원', () => applyLockScreen(on ? todayQr() : null));
 };
 
+// 마지막으로 저장한 QR 번호 { date, issueNo }. 날이 바뀐 뒤 받은 번호가 이것과 같으면 휘닉스가 아직 QR을 갱신하지 않은 것으로 본다.
+const LAST_ISSUE_KEY = 'lastIssue';
+const rememberIssue = (qr) => localStorage.setItem(LAST_ISSUE_KEY, JSON.stringify({ date: qr.date, issueNo: qr.issueNo }));
+
 $('#get').onclick = () => run($('#get'), 'QR 받는', async () => {
   // 오늘 받은 QR 이미지가 저장돼 있으면 네트워크 없이 바로 보여준다.
   let qr = todayQr();
   if (!qr) {
     const issueNo = await withRelogin(getIssueNo);
     qr = { date: kstToday(), issueNo, img: await fetchQrImage(issueNo) };
+    const last = JSON.parse(localStorage.getItem(LAST_ISSUE_KEY) || 'null');
+    // 어제 번호와 같으면 보여주기만 하고 오늘 QR로 저장하지 않는다. 그래야 다음에 누를 때 휘닉스에 다시 확인한다.
+    // 같은 번호가 게이트에서 통과될 수도 있어서 막지는 않는다.
+    if (last && last.date !== qr.date && last.issueNo === issueNo) return showQr(qr, true);
     localStorage.setItem(QR_KEY, JSON.stringify(qr));
+    rememberIssue(qr);
     if ($('#lockWp').checked) await applyLockScreen(qr);
   }
   showQr(qr);
@@ -335,6 +362,11 @@ $('#get').onclick = () => run($('#get'), 'QR 받는', async () => {
 
 // 초기화하면 다음 QR 받기에서 페이지부터 다시 확인한다.
 $('#clear').onclick = () => {
+  if (staleShown) {
+    showQr(null);
+    $('#get').click();
+    return;
+  }
   localStorage.removeItem(QR_KEY);
   showQr(null);
   $('#msg').className = '';
@@ -345,7 +377,10 @@ $('#clear').onclick = () => {
 // QR은 KST 자정에 무효가 된다. 앱을 켜둔 채 자정을 넘기거나 다음 날 앱으로 돌아오면 지난 QR을 앱과 잠금화면에서 내린다.
 function expireOldQr() {
   const saved = JSON.parse(localStorage.getItem(QR_KEY) || 'null');
-  if (saved && saved.date !== kstToday()) localStorage.removeItem(QR_KEY);
+  if (saved && saved.date !== kstToday()) {
+    rememberIssue(saved);
+    localStorage.removeItem(QR_KEY);
+  }
   showQr(todayQr());
   const lockDate = localStorage.getItem(LOCK_DATE_KEY);
   if (lockDate && lockDate !== kstToday()) run($('#clear'), '지난 잠금화면 QR 정리', () => applyLockScreen(null));
@@ -371,9 +406,21 @@ async function refreshSession() {
   }
 }
 
+// 설정에서 켜면, 날이 바뀐 뒤 앱(웹)을 열 때 QR까지 받는다. 자동 로그인이 켜져 있을 때만 동작한다.
+const autoQrOn = () => opts.auto && opts.autoQr;
+function autoGetQr() {
+  if (autoQrOn() && !todayQr()) $('#get').click();
+}
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   expireOldQr();
+  // 앱으로 돌아올 때도 세션 확인과 같은 5분 간격으로만 시도한다.
+  if (autoQrOn() && !todayQr() && Date.now() - lastSessionCheck >= SESSION_CHECK_MS) {
+    lastSessionCheck = Date.now();
+    autoGetQr();
+    return;
+  }
   refreshSession();
 });
 expireOldQr();
@@ -388,6 +435,7 @@ if (opts.save) {
     if (!creds) return;
     $('#id').value = creds.id;
     $('#pw').value = creds.pw;
-    if (opts.auto) doLogin();
+    // 로그인을 마친 뒤 QR 자동 받기를 한다. 로그인이 실패했으면 QR 받기가 한 번 더 로그인을 시도한다.
+    if (opts.auto) doLogin().then(autoGetQr);
   });
 }
