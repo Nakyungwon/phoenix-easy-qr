@@ -65,6 +65,14 @@
   .setting .badge { padding-left: 28px; }
   .hint { margin: 0 0 6px 28px; font-size: 13px; color: var(--muted); }
   .hint[hidden] { display: none; }
+  #installSetting .btn-small { justify-self: start; margin: 8px 0 4px; }
+  #installSetting .hint { margin-left: 0; }
+  /* 모바일 브라우저로 열었을 때만 보이는 홈 화면 추가 안내. QR을 가리지 않게 제목과 QR 카드 사이에 둔다. */
+  .install { display: flex; align-items: center; gap: 10px; padding: 12px 8px 12px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
+  .install[hidden], .install .btn-small[hidden] { display: none; }
+  .install-text { flex: 1; display: grid; gap: 2px; font-size: 14px; }
+  .install-text span { color: var(--muted); font-size: 13px; }
+  .install .btn-small { width: auto; flex: none; }
   header .eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--sky); }
   header h1 { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
 
@@ -152,6 +160,17 @@
     </button>
   </header>
 
+  <div class="install" id="installBanner" hidden>
+    <div class="install-text">
+      <strong id="installTitle">홈 화면에 추가해 주세요</strong>
+      <span id="installHow"></span>
+    </div>
+    <button class="btn-primary btn-small" id="installBtn" hidden>설치</button>
+    <button class="icon-btn" id="installClose" aria-label="안내 닫기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
   <section class="ticket" aria-label="입장 QR">
     <div class="ticket-head">
       <div>
@@ -228,6 +247,10 @@
     <div class="setting">
       <label class="check"><input type="checkbox" id="autoQr">QR 자동 갱신</label>
       <p class="hint" id="autoQrHint"></p>
+    </div>
+    <div class="setting" id="installSetting" hidden>
+      <button class="btn-ghost btn-small" id="installOpen">홈 화면에 추가</button>
+      <p class="hint">아이콘으로 앱처럼 열 수 있어요</p>
     </div>
   </section>
 </div>
